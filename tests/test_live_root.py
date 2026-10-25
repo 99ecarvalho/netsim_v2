@@ -66,3 +66,10 @@ async def test_saved_profile_survives_restart_and_applies_live(engine):
     rt = await engine.up("t-live")
     assert "rate 50Mbit" in kernel_netem(rt.iface_ns("c"), "eth0")
     assert (await engine.adopt("t-live", text + "  - {a: s, b: c, name: second}\n"))["restart"] is True
+
+
+async def test_concurrent_starts_get_distinct_subnets(engine):
+    engine.labs.save("t-par1", LAB)
+    engine.labs.save("t-par2", LAB)
+    a, b = await asyncio.gather(engine.up("t-par1"), engine.up("t-par2"))
+    assert not a.plan.base.overlaps(b.plan.base)

@@ -212,6 +212,7 @@ class Engine:
         self.probes: dict[str, Probe] = {}
         self.failures: dict[str, str] = {}
         self._locks: dict[str, asyncio.Lock] = {}
+        self._alloc_lock = asyncio.Lock()
         self._stats_task: asyncio.Task | None = None
         self.global_runner = Runner()
 
@@ -317,9 +318,9 @@ class Engine:
 
     # ---------------------------------------------------------------- planning
 
-    async def _used_networks(self, exclude: str | None = None) -> list[ipaddress.IPv4Network]:
+    async def _used_networks(self, exclude: str | None = None, labs: bool = True) -> list[ipaddress.IPv4Network]:
         nets = []
-        for rt in self.running.values():
+        for rt in self.running.values() if labs else ():
             if rt.name != exclude:
                 nets.append(rt.plan.base)
                 nets += [s.subnet for s in rt.plan.segments]
@@ -364,6 +365,27 @@ class Engine:
             shapes[link.id] = shape
         return shapes
 
+    async def _check_conflicts(self, name: str, plan: Plan) -> None:
+        """Refuse address or name clashes with running labs and, when the lab reaches the host, its routes."""
+        tag = lab_tag(name)
+        for other in self.running.values():
+            if other.name != name and lab_tag(other.name) == tag and (plan.external and other.plan.external):
+                raise EngineError(f"labs {name} and {other.name} map to the same host interface names; rename one")
+        if not plan.external:
+            return  # namespaces are isolated: overlapping subnets cannot meet
+        mine = [s.subnet for s in plan.segments]
+        for other in self.running.values():
+            if other.name == name or not other.plan.external:
+                continue
+            for net in mine:
+                for theirs in (s.subnet for s in other.plan.segments):
+                    if net.overlaps(theirs):
+                        raise EngineError(f"subnet {net} overlaps {theirs} of running lab {other.name}")
+        for route in await self._used_networks(exclude=name, labs=False):
+            for net in mine:
+                if route.prefixlen > 0 and net.overlaps(route):
+                    raise EngineError(f"subnet {net} overlaps host route {route}; set another 'subnet'")
+
     async def preview(self, lab: Lab, name: str) -> dict:
         """Compile without touching the system (used by the editor)."""
         base = await self.allocate_base(lab, name) if name not in self.running else str(self.running[name].plan.base)
@@ -384,23 +406,27 @@ class Engine:
                 raise EngineError("netsim must run as root to build labs")
             source = text if text is not None else self.labs.text(name)
             lab = parse_yaml(source, Lab, name)
-            try:
-                shapes = self.link_shapes(lab)
-                base = await self.allocate_base(lab, name)
-                plan = compile_lab(lab, name, base)
-            except (PlanError, EngineError) as e:
-                self.failures[name] = str(e)
-                self._labs_changed()
-                raise EngineError(str(e)) from None
-            rt = LabRuntime(name, lab, plan, Runner(), source_text=source)
-            rt.runner.on_record = lambda rec: self.bus.publish(f"lab:{name}:cmd", rec.to_json())
-            for link in lab.links:
-                rt.links[link.id] = LinkState(shapes[link.id], link.profile)
-            for p in lab.programs:
-                rt.programs[p.name] = ProgramState(p)
-            for px in lab.proxies:
-                rt.proxies[px.name] = ProxyState(px)
-            self.running[name] = rt
+            # choosing a subnet and registering the lab is one step for all labs: two labs
+            # starting together must not both see 10.201.0.0/16 as free
+            async with self._alloc_lock:
+                try:
+                    shapes = self.link_shapes(lab)
+                    base = await self.allocate_base(lab, name)
+                    plan = compile_lab(lab, name, base)
+                    await self._check_conflicts(name, plan)
+                except (PlanError, EngineError) as e:
+                    self.failures[name] = str(e)
+                    self._labs_changed()
+                    raise EngineError(str(e)) from None
+                rt = LabRuntime(name, lab, plan, Runner(), source_text=source)
+                rt.runner.on_record = lambda rec: self.bus.publish(f"lab:{name}:cmd", rec.to_json())
+                for link in lab.links:
+                    rt.links[link.id] = LinkState(shapes[link.id], link.profile)
+                for p in lab.programs:
+                    rt.programs[p.name] = ProgramState(p)
+                for px in lab.proxies:
+                    rt.proxies[px.name] = ProxyState(px)
+                self.running[name] = rt
             self.failures.pop(name, None)
             self._labs_changed()
             self.event(rt, "info", f"starting (subnet {base})")
