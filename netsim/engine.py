@@ -215,12 +215,13 @@ class Engine:
 
     # ---------------------------------------------------------------- lifecycle
 
-    async def start(self) -> None:
+    async def start(self, cleanup: bool = True) -> None:
         self.run_dir.mkdir(parents=True, exist_ok=True)
         (self.run_dir / "captures").mkdir(exist_ok=True)
         system.TC_ENV["TC_LIB_DIR"] = str(install_distributions(self.run_dir / "tc"))
         system.init_root_ns_fd()
-        await self.cleanup_stale()
+        if cleanup:  # off for tests, which must not touch a daemon running on the same host
+            await self.cleanup_stale()
         self._stats_task = asyncio.create_task(self._stats_loop())
 
     async def stop(self) -> None:
