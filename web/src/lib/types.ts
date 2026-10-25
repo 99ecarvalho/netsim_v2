@@ -127,6 +127,7 @@ export interface AppliedDir {
 
 export interface LinkRuntime {
   profile: string | null;
+  file_profile: string | null;
   runtime: Record<Direction, Record<string, unknown>>;
   timeline: boolean;
   step: number | null;

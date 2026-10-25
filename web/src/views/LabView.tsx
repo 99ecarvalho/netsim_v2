@@ -61,21 +61,28 @@ export default function LabView({ name, tabId, visible }: { name: string; tabId:
   };
 
   // ---------------------------------------------------------------- source
+  // the last text known to be on disk; a ref so `load` never compares against a stale value
+  const savedRef = useRef<string | null>(null);
+
+  /** (Re)read the file. Unsaved edits are kept; otherwise the editor follows the file. */
   const load = useCallback(async () => {
     try {
       const r = await api.get<{ text: string }>(`/api/labs/${enc(name)}`);
+      const previous = savedRef.current;
+      savedRef.current = r.text;
       setSaved(r.text);
-      setText((cur) => (cur === null || cur === saved ? r.text : cur));
+      setText((cur) => (cur === null || cur === previous ? r.text : cur));
       setLoadError(null);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : String(e));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name]);
 
   useEffect(() => {
     load();
   }, [load]);
+  // the file can change outside this tab (CLI, "Save to lab", another tab or editor)
+  useTopic("labs", () => load());
 
   const dirty = text !== null && saved !== null && text !== saved;
   useEffect(() => setDirty(tabId, dirty), [dirty, tabId, setDirty]);
@@ -98,9 +105,13 @@ export default function LabView({ name, tabId, visible }: { name: string; tabId:
   const save = useCallback(async () => {
     if (text === null) return;
     try {
-      await api.put(`/api/labs/${enc(name)}`, { text });
+      const r = await api.put<{ live: string[]; restart: boolean }>(`/api/labs/${enc(name)}`, { text });
+      savedRef.current = text;
       setSaved(text);
-      useStore.getState().toast("success", running ? "Saved. Restart the lab to apply topology changes." : "Saved");
+      const toast = useStore.getState().toast;
+      if (r.restart) toast("info", "Saved. Nodes, wiring, programs or proxies changed: restart the lab to apply.");
+      else if (r.live.length) toast("success", `Saved and applied live: ${r.live.join(", ")}`);
+      else toast("success", "Saved");
     } catch (e) {
       toastError(e);
     }
@@ -270,7 +281,8 @@ export default function LabView({ name, tabId, visible }: { name: string; tabId:
         />
       )}
       {effectiveView === "monitor" && runtime && (
-        <Monitor name={name} data={parsed.data} runtime={runtime} samples={samples} events={events} />
+        <Monitor name={name} data={parsed.data} runtime={runtime} samples={samples} events={events}
+          editorDirty={dirty} onFileSaved={load} />
       )}
       {effectiveView === "traffic" && runtime && <Traffic name={name} runtime={runtime} />}
       {effectiveView === "programs" && runtime && <Programs name={name} runtime={runtime} />}

@@ -64,7 +64,7 @@ export default function Inspector({ data, plan, selection, onSelect, mutate, run
       <div className="body">
         {running && (
           <div className="badge warn" style={{ whiteSpace: "normal" }}>
-            Lab is running: topology edits apply after save + restart. Use Monitor for live link changes.
+            Lab is running. Link profiles and shaping apply live when you save; nodes, wiring and programs need a restart.
           </div>
         )}
         {selection.type === "node" ? (

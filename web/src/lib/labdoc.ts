@@ -27,7 +27,7 @@ export function parseLab(text: string): ParsedLab {
 }
 
 export function serialize(doc: Document): string {
-  return doc.toString({ lineWidth: 100, flowCollectionPadding: false });
+  return doc.toString({ lineWidth: 80, flowCollectionPadding: false });
 }
 
 function ensureMap(doc: Document, key: string): YAMLMap {

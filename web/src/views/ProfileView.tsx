@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 // Copyright (C) 2026 Eduardo Correia
 import { Copy, Files, Save, Trash2, Undo2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import YAML from "yaml";
 import CodeEditor from "../components/CodeEditor";
 import { createProfile } from "../components/Sidebar";
@@ -12,6 +12,7 @@ import { lineOf } from "../lib/labdoc";
 import { toastError, useStore } from "../lib/store";
 import type { ValidationDetail } from "../lib/types";
 import { Lazy } from "./lab/Inspector";
+import { useTopic } from "../lib/ws";
 
 interface Rendered {
   summary: string;
@@ -35,14 +36,19 @@ export default function ProfileView({ name, tabId }: { name: string; tabId: stri
   const [v, setV] = useState<ProfileValidation | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  useEffect(() => {
+  const savedRef = useRef<string | null>(null);
+  const load = useCallback(() => {
     api.get<{ text: string }>(`/api/profiles/${enc(name)}`)
       .then((p) => {
+        const previous = savedRef.current;
+        savedRef.current = p.text;
         setSaved(p.text);
-        setText(p.text);
+        setText((cur) => (cur === null || cur === previous ? p.text : cur));
       })
       .catch((e) => setErr(e.message));
   }, [name]);
+  useEffect(() => load(), [load]);
+  useTopic("profiles", (d: { changed?: string }) => d.changed === name && load());
 
   const dirty = text !== null && text !== saved;
   useEffect(() => setDirty(tabId, dirty), [dirty, tabId, setDirty]);
@@ -58,10 +64,11 @@ export default function ProfileView({ name, tabId }: { name: string; tabId: stri
   const save = useCallback(async () => {
     if (text === null) return;
     try {
-      await api.put(`/api/profiles/${enc(name)}`, { text });
+      const r = await api.put<{ reapplied: string[] }>(`/api/profiles/${enc(name)}`, { text });
+      savedRef.current = text;
       setSaved(text);
       useStore.getState().refreshProfiles();
-      useStore.getState().toast("success", "Saved. Running labs pick it up when the link is re-applied or the lab restarts.");
+      useStore.getState().toast("success", r.reapplied.length ? `Saved and re-applied on ${r.reapplied.join(", ")}` : "Saved");
     } catch (e) {
       toastError(e);
     }
@@ -81,7 +88,7 @@ export default function ProfileView({ name, tabId }: { name: string; tabId: stri
       const m = d.get(k);
       if (m && typeof m === "object" && "items" in (m as object) && (m as { items: unknown[] }).items.length === 0) d.delete(k);
     }
-    setText(d.toString({ lineWidth: 100 }));
+    setText(d.toString({ lineWidth: 80 }));
   };
 
   const diagnostics = useMemo(() => {

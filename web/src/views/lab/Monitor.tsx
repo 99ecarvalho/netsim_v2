@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 // Copyright (C) 2026 Eduardo Correia
-import { Copy, Scissors, Undo2, Zap } from "lucide-react";
+import { Copy, Save, Scissors, Undo2, Zap } from "lucide-react";
+import YAML from "yaml";
+import { serialize, setIn } from "../../lib/labdoc";
 import { useEffect, useMemo, useState } from "react";
 import Chart, { type SeriesDef } from "../../components/Chart";
 import Topology, { type Selection } from "../../components/Topology";
@@ -16,6 +18,8 @@ interface Props {
   runtime: Runtime;
   samples: StatsSample[];
   events: LabEvent[];
+  editorDirty: boolean;
+  onFileSaved: () => void;
 }
 
 const THROUGHPUT: SeriesDef[] = [
@@ -33,7 +37,7 @@ const QUEUE: SeriesDef[] = [
 
 const bps = (v: number) => fmtBps(v, 2);
 
-export default function Monitor({ name, runtime, samples, events }: Props) {
+export default function Monitor({ name, runtime, samples, events, editorDirty, onFileSaved }: Props) {
   const [selection, setSelection] = useState<Selection>(null);
   const latest = samples[samples.length - 1] ?? null;
   // the running lab's own spec, not the (maybe edited) file
@@ -51,7 +55,8 @@ export default function Monitor({ name, runtime, samples, events }: Props) {
       right={
         <div className="scroll">
           {selection?.type === "link" ? (
-            <LinkPanel key={selection.id} lab={name} id={selection.id} runtime={runtime} samples={samples} />
+            <LinkPanel key={selection.id} lab={name} id={selection.id} runtime={runtime} samples={samples}
+              editorDirty={editorDirty} onFileSaved={onFileSaved} />
           ) : selection?.type === "node" ? (
             <NodePanel key={selection.id} lab={name} node={selection.id} runtime={runtime} />
           ) : (
@@ -207,7 +212,14 @@ interface StepInfo {
   up: { summary: string };
 }
 
-function LinkPanel({ lab, id, runtime, samples }: { lab: string; id: string; runtime: Runtime; samples: StatsSample[] }) {
+function LinkPanel({ lab, id, runtime, samples, editorDirty, onFileSaved }: {
+  lab: string;
+  id: string;
+  runtime: Runtime;
+  samples: StatsSample[];
+  editorDirty: boolean;
+  onFileSaved: () => void;
+}) {
   const profiles = useStore((s) => s.profiles);
   const lr = runtime.links[id];
   const pl = runtime.plan.links[id];
@@ -240,6 +252,24 @@ function LinkPanel({ lab, id, runtime, samples }: { lab: string; id: string; run
     }
   };
   const overrides = { ...lr.runtime.up, ...lr.runtime.down };
+  const liveOnly = (lr.profile ?? null) !== (lr.file_profile ?? null);
+
+  /** Write the live profile into the lab file (comments kept); the daemon adopts it without restart. */
+  const saveToFile = async () => {
+    try {
+      const { text } = await api.get<{ text: string }>(`/api/labs/${enc(lab)}`);
+      const doc = YAML.parseDocument(text);
+      const links = ((doc.toJS() ?? {}).links ?? []) as { a: string; b: string; name?: string }[];
+      const idx = links.findIndex((l) => (l.name || `${l.a}--${l.b}`) === id);
+      if (idx < 0) throw new Error(`link ${id} is not in the lab file any more`);
+      setIn(doc, ["links", idx, "profile"], lr.profile ?? undefined);
+      await api.put(`/api/labs/${enc(lab)}`, { text: serialize(doc) });
+      onFileSaved();
+      useStore.getState().toast("success", `${id}: profile ${lr.profile ?? "none"} saved to labs/${lab}.yaml`);
+    } catch (e) {
+      toastError(e);
+    }
+  };
   const hasOverrides = Object.keys(lr.runtime.up ?? {}).length + Object.keys(lr.runtime.down ?? {}).length > 0;
 
   return (
@@ -267,6 +297,20 @@ function LinkPanel({ lab, id, runtime, samples }: { lab: string; id: string; run
               </button>
             )}
           </div>
+          {liveOnly && (
+            <div className="row badge warn" style={{ whiteSpace: "normal", padding: "6px 10px", borderRadius: 8 }}>
+              <span className="grow">
+                Live change: the file says <b>{lr.file_profile ?? "no profile"}</b>. It goes back to that on restart.
+              </span>
+              <button className="btn small" onClick={saveToFile} disabled={editorDirty}
+                title={editorDirty ? "Save or discard your edits in Design first" : "Write this profile into the lab file"}>
+                <Save size={12} /> Save to lab
+              </button>
+            </div>
+          )}
+          {cut && (
+            <span className="faint" style={{ fontSize: 11 }}>Cut is a live override: Heal, or pick a profile, to bring the link back.</span>
+          )}
           <div className="kv mono" style={{ fontSize: 11.5 }}>
             <dt className="up">a→b</dt>
             <dd>{lr.up?.summary}</dd>
@@ -345,7 +389,7 @@ function LinkPanel({ lab, id, runtime, samples }: { lab: string; id: string; run
               if (Object.keys(params).length) patch({ params: { [dir]: params } }).then(() => setForm({}));
             }}>Apply</button>
             <button className="btn" disabled={!hasOverrides} onClick={() => patch({ reset: true })}>Reset overrides</button>
-            <span className="faint" style={{ fontSize: 11 }}>Applied immediately with tc; not saved to the lab file.</span>
+            <span className="faint" style={{ fontSize: 11 }}>Applied immediately with tc. Temporary: switching profile or restarting drops them.</span>
           </div>
         </div>
       </div>
