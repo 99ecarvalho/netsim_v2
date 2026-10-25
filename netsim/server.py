@@ -489,7 +489,7 @@ def _render(params: dict) -> dict:
 
 def build(run_dir: Path = RUN_DIR, home: Path | None = None, user_path: str | None = None,
           check_host: bool = True) -> tuple[FastAPI, str]:
-    """Create the app. The caller must hold acquire_instance_lock(run_dir)."""
+    """Create the app. The caller must hold acquire_instance_lock()."""
     home = home or home_dir()
     if copied := seed_home(home):
         log.info("copied %d example profiles/labs to %s", len(copied), home)

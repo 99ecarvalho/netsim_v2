@@ -106,15 +106,20 @@ class InstanceRunning(RuntimeError):
         self.pid = pid
 
 
-def acquire_instance_lock(run_dir: Path = RUN_DIR) -> int:
-    """Exclusive, process-wide lock for whatever owns the host's netsim resources.
+# Host-wide on purpose: namespaces, interfaces and firewall rules belong to the host, not to
+# a run directory, so NETSIM_RUN_DIR must not be able to create a second owner.
+LOCK_PATH = Path("/run/lock/netsim.lock") if Path("/run/lock").is_dir() else Path("/run/netsim.lock")
+
+
+def acquire_instance_lock(lock_path: Path | None = None) -> int:
+    """Exclusive, host-wide lock for whatever owns the host's netsim resources.
 
     Taken before any side effect (token, cleanup, endpoint), so a second daemon -
     or `netsim cleanup` while a daemon runs - refuses without touching anything.
     The lock is released by the kernel when the process exits, even on a crash.
     """
-    run_dir.mkdir(parents=True, exist_ok=True)
-    fd = os.open(run_dir / "daemon.lock", os.O_RDWR | os.O_CREAT, 0o644)
+    path = lock_path or LOCK_PATH
+    fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o644)
     try:
         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError:

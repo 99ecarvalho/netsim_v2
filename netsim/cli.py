@@ -116,7 +116,7 @@ def cmd_serve(args) -> None:
                         format="%(asctime)s %(levelname)-7s %(name)s: %(message)s", datefmt="%H:%M:%S")
     # order matters: lock, then port, and only then anything with side effects
     try:
-        lock = acquire_instance_lock(RUN_DIR)  # noqa: F841 - held for the life of the process
+        lock = acquire_instance_lock()  # noqa: F841 - held for the life of the process
     except InstanceRunning as e:
         raise CliError(f"{e}. Open it with `netsim ui`, or stop it first.") from None
     sock = _bind(args.host, args.port)
@@ -649,7 +649,7 @@ def cmd_cleanup(args) -> None:
     from netsim.store import LabStore, ProfileStore
 
     try:
-        lock = acquire_instance_lock(RUN_DIR)  # noqa: F841 - never clean behind a live daemon
+        lock = acquire_instance_lock()  # noqa: F841 - never clean behind a live daemon
     except InstanceRunning as e:
         raise CliError(f"{e} but does not answer; stop it before cleaning up") from None
     home = home_dir()
