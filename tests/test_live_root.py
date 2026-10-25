@@ -73,3 +73,12 @@ async def test_concurrent_starts_get_distinct_subnets(engine):
     engine.labs.save("t-par2", LAB)
     a, b = await asyncio.gather(engine.up("t-par1"), engine.up("t-par2"))
     assert not a.plan.base.overlaps(b.plan.base)
+
+
+async def test_restart_keeps_temporary_lab(engine):
+    engine.labs.save("t-temp", LAB, ephemeral=True)
+    await engine.up("t-temp")
+    await engine.restart("t-temp")
+    assert "t-temp" in engine.running and engine.labs.is_ephemeral("t-temp")
+    await engine.down("t-temp")
+    assert not engine.labs.exists("t-temp")

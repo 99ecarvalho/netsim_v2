@@ -455,7 +455,7 @@ class Engine:
                     ps.task = asyncio.create_task(self._delayed_start(rt, ps, delay))
             return rt
 
-    async def down(self, name: str) -> None:
+    async def down(self, name: str, forget_ephemeral: bool = True) -> None:
         async with self._lock(name):
             rt = self.running.get(name)
             if not rt:
@@ -465,13 +465,13 @@ class Engine:
             await self._teardown(rt)
             self.running.pop(name, None)
             self.event(name, "info", "stopped")
-            if self.labs.is_ephemeral(name):
+            if forget_ephemeral and self.labs.is_ephemeral(name):
                 self.labs.delete(name)
             self._labs_changed()
 
     async def restart(self, name: str) -> LabRuntime:
         if name in self.running:
-            await self.down(name)
+            await self.down(name, forget_ephemeral=False)  # a temporary lab survives its restart
         return await self.up(name)
 
     async def _build(self, rt: LabRuntime) -> None:
