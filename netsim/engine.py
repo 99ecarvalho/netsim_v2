@@ -1070,10 +1070,28 @@ class Engine:
 
     # ---------------------------------------------------------------- captures
 
+    def _make_room(self, kind: str, lab: str) -> None:
+        """Keep at most KEEP_* captures/probes per lab, the new one included.
+
+        The oldest finished ones go first; when all are still running the new one is refused.
+        """
+        items, keep, remove, active = (
+            (self.captures, KEEP_CAPTURES, self.capture_delete, lambda c: bool(c.proc and c.proc.running))
+            if kind == "capture" else
+            (self.probes, KEEP_PROBES, lambda pid: self.probes.pop(pid, None), lambda p: p.running))
+        mine = sorted((x for x in items.values() if x.lab == lab), key=lambda x: x.started)
+        finished = [x for x in mine if not active(x)]
+        over = len(mine) + 1 - keep
+        if over > len(finished):
+            raise EngineError(f"{keep} {kind}s are running in lab {lab}; stop one first")
+        for old in finished[:max(0, over)]:
+            remove(old.id)
+
     async def capture_start(self, name: str, link_id: str, side: str = "a", bpf: str = "") -> Capture:
         rt = self._rt(name)
         if link_id not in rt.plan.links:
             raise EngineError(f"unknown link {link_id}")
+        self._make_room("capture", name)
         lp = rt.plan.links[link_id]
         end = lp.a if side == "a" else lp.b
         if rt.plan.nodes[end.node].kind == "switch":
@@ -1120,14 +1138,6 @@ class Engine:
                 pass
         cap.flusher = asyncio.create_task(flush())
         self.captures[cid] = cap
-        mine = sorted((c for c in self.captures.values() if c.lab == name), key=lambda c: c.started)
-        excess = len(mine) - KEEP_CAPTURES
-        for old in mine:  # drop the oldest finished captures beyond the limit
-            if excess <= 0:
-                break
-            if not (old.proc and old.proc.running):
-                self.capture_delete(old.id)
-                excess -= 1
         self.event(rt, "info", f"capture {cid} on {link_id} ({end.node}/{end.name})")
         self._changed(rt)
         return cap
@@ -1153,6 +1163,7 @@ class Engine:
 
     async def probe_start(self, name: str, kind: str, src: str, dst: str, options: dict | None = None) -> Probe:
         rt = self._rt(name)
+        self._make_room("probe", name)
         options = options or {}
         for n in (src, dst):
             if n not in rt.plan.nodes or rt.plan.nodes[n].kind == "switch":
@@ -1207,10 +1218,6 @@ class Engine:
             self._changed(rt)
         probe.task = asyncio.create_task(watch())
         self.probes[pid] = probe
-        mine = sorted((p for p in self.probes.values() if p.lab == name), key=lambda p: p.started)
-        for old in mine[:-KEEP_PROBES]:
-            if not old.running:
-                self.probes.pop(old.id, None)
         self._changed(rt)
         return probe
 
