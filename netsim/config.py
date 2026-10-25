@@ -21,7 +21,9 @@ class User:
 
 
 def invoking_user() -> User:
-    """The human behind sudo, so files and programs are not owned by root."""
+    """The human behind sudo (or NETSIM_USER), so files and programs are not owned by root."""
+    if name := os.environ.get("NETSIM_USER"):
+        return lookup_user(name)
     uid = int(os.environ.get("SUDO_UID", os.getuid()))
     gid = int(os.environ.get("SUDO_GID", os.getgid()))
     try:

@@ -99,6 +99,8 @@ def table(rows: list[list[str]], header: list[str]) -> str:
 
 def cmd_serve(args) -> None:
     elevate(sys.argv[1:])
+    if args.user:
+        os.environ["NETSIM_USER"] = args.user
     import asyncio
     import logging
 
@@ -528,6 +530,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--host", default="127.0.0.1")
     sp.add_argument("--port", type=int, default=DEFAULT_PORT)
     sp.add_argument("--open", action="store_true", help="open the web UI in a browser")
+    sp.add_argument("--user", help="run lab programs and own files as this user (default: the sudo user)")
     sp.add_argument("-v", "--verbose", action="store_true")
 
     sp = add("ui", cmd_ui, "open the web UI of the running daemon")
