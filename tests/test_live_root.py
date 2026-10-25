@@ -98,6 +98,8 @@ async def test_capture_stops_at_size_limit(engine, monkeypatch):
 @pytest.fixture
 def container():
     if subprocess.run(["docker", "image", "inspect", "nginx:alpine"], capture_output=True).returncode:
+        if os.environ.get("NETSIM_REQUIRE_DOCKER"):  # CI: a missing image must fail, not hide the test
+            pytest.fail("nginx:alpine is not available")
         pytest.skip("needs docker and the nginx:alpine image")
     name = "netsim-test-shared"
     subprocess.run(["docker", "rm", "-f", name], capture_output=True)
@@ -124,3 +126,19 @@ async def test_container_cannot_join_two_labs(engine, container):
     assert ifaces() == before  # the failed lab did not touch the first one's interface
     await engine.down("t-ctr-a")
     assert not any(i.startswith("sim") for i in ifaces())
+
+
+async def test_concurrent_starts_respect_retention(engine):
+    from netsim import engine as eng
+    from netsim.engine import EngineError
+    await engine.up("t-live")
+    extra = 3
+    caps = await asyncio.gather(*(engine.capture_start("t-live", "c--s") for _ in range(eng.KEEP_CAPTURES + extra)),
+                                return_exceptions=True)
+    assert sum(not isinstance(c, Exception) for c in caps) == eng.KEEP_CAPTURES
+    assert all(isinstance(c, EngineError) for c in caps if isinstance(c, Exception))
+    assert len([c for c in engine.captures.values() if c.lab == "t-live"]) == eng.KEEP_CAPTURES
+    probes = await asyncio.gather(*(engine.probe_start("t-live", "ping", "c", "s", {"interval": 1})
+                                    for _ in range(eng.KEEP_PROBES + extra)), return_exceptions=True)
+    assert sum(not isinstance(p, Exception) for p in probes) == eng.KEEP_PROBES
+    assert len([p for p in engine.probes.values() if p.lab == "t-live"]) == eng.KEEP_PROBES

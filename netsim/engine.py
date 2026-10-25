@@ -1088,6 +1088,11 @@ class Engine:
             remove(old.id)
 
     async def capture_start(self, name: str, link_id: str, side: str = "a", bpf: str = "") -> Capture:
+        # held from the room check until the capture is registered: concurrent starts can't share a slot
+        async with self._lock(f"capture:{name}"):
+            return await self._capture_start(name, link_id, side, bpf)
+
+    async def _capture_start(self, name: str, link_id: str, side: str, bpf: str) -> Capture:
         rt = self._rt(name)
         if link_id not in rt.plan.links:
             raise EngineError(f"unknown link {link_id}")
@@ -1162,6 +1167,10 @@ class Engine:
     # ---------------------------------------------------------------- probes
 
     async def probe_start(self, name: str, kind: str, src: str, dst: str, options: dict | None = None) -> Probe:
+        async with self._lock(f"probe:{name}"):  # same as captures: room check and registration together
+            return await self._probe_start(name, kind, src, dst, options)
+
+    async def _probe_start(self, name: str, kind: str, src: str, dst: str, options: dict | None) -> Probe:
         rt = self._rt(name)
         self._make_room("probe", name)
         options = options or {}
