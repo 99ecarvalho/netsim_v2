@@ -93,7 +93,10 @@ start() {
     info
     return
   fi
-  mkdir -p "$STATE"
+  # state and log are private: the log must never leak anything to other local users
+  (umask 077 && mkdir -p "$STATE" && : >>"$LOG")
+  chmod 700 "$STATE"
+  chmod 600 "$LOG"
   say "starting netsim daemon (needs sudo)"
   sudo -n true 2>/dev/null || sudo -v   # ask for the password only if needed
   # setsid + nohup: the daemon survives this terminal; the pid written is the python process

@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import fcntl
 import os
 import pwd
 from dataclasses import dataclass
@@ -67,3 +68,29 @@ def chown_to_user(path: Path) -> None:
         os.chown(path, u.uid, u.gid)
     except OSError:
         pass
+
+
+class InstanceRunning(RuntimeError):
+    def __init__(self, pid: str):
+        super().__init__(f"another netsim daemon is running (pid {pid or '?'})")
+        self.pid = pid
+
+
+def acquire_instance_lock(run_dir: Path = RUN_DIR) -> int:
+    """Exclusive, process-wide lock for whatever owns the host's netsim resources.
+
+    Taken before any side effect (token, cleanup, endpoint), so a second daemon -
+    or `netsim cleanup` while a daemon runs - refuses without touching anything.
+    The lock is released by the kernel when the process exits, even on a crash.
+    """
+    run_dir.mkdir(parents=True, exist_ok=True)
+    fd = os.open(run_dir / "daemon.lock", os.O_RDWR | os.O_CREAT, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        pid = os.pread(fd, 32, 0).decode(errors="replace").strip()
+        os.close(fd)
+        raise InstanceRunning(pid) from None
+    os.ftruncate(fd, 0)
+    os.pwrite(fd, f"{os.getpid()}\n".encode(), 0)
+    return fd

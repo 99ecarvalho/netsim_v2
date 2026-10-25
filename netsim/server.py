@@ -488,6 +488,7 @@ def _render(params: dict) -> dict:
 
 def build(run_dir: Path = RUN_DIR, home: Path | None = None, user_path: str | None = None,
           check_host: bool = True) -> tuple[FastAPI, str]:
+    """Create the app. The caller must hold acquire_instance_lock(run_dir)."""
     home = home or home_dir()
     bus = Bus()
     engine = Engine(ProfileStore(home / "profiles"), LabStore(home / "labs"), bus, run_dir, user_path=user_path)

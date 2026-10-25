@@ -110,25 +110,51 @@ def cmd_serve(args) -> None:
 
     from netsim.server import build
 
+    from netsim.config import InstanceRunning, acquire_instance_lock
+
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
                         format="%(asctime)s %(levelname)-7s %(name)s: %(message)s", datefmt="%H:%M:%S")
+    # order matters: lock, then port, and only then anything with side effects
+    try:
+        lock = acquire_instance_lock(RUN_DIR)  # noqa: F841 - held for the life of the process
+    except InstanceRunning as e:
+        raise CliError(f"{e}. Open it with `netsim ui`, or stop it first.") from None
+    sock = _bind(args.host, args.port)
     loopback = args.host in ("127.0.0.1", "localhost", "::1")
     # bound to a real interface: Host header can be anything, the token still protects the API
     app, token = build(user_path=args.user_path or None, check_host=loopback)
     shown = "127.0.0.1" if args.host in ("0.0.0.0", "::") else args.host
     url = f"http://{shown}:{args.port}"
-    RUN_DIR.mkdir(parents=True, exist_ok=True)
     ENDPOINT_FILE.write_text(url + "\n")
-    print(f"netsim {__version__}  profiles+labs in {home_dir()}")
-    print(f"web UI: {url}/?token={token}")
+    print(f"netsim {__version__}  profiles+labs in {home_dir()}", flush=True)
+    if sys.stdout.isatty():
+        print(f"web UI: {url}/?token={token}", flush=True)
+    else:
+        # never write the token where others may read it (log files, journald)
+        print(f"web UI: {url}  (run `netsim ui` for the login link)", flush=True)
     if args.open:
         _open_browser(f"{url}/?token={token}")
-    config = uvicorn.Config(app, host=args.host, port=args.port, log_level="warning", ws_ping_interval=20)
+    config = uvicorn.Config(app, log_level="warning", ws_ping_interval=20)
     server = uvicorn.Server(config)
     try:
-        asyncio.run(server.serve())
+        asyncio.run(server.serve(sockets=[sock]))
     except KeyboardInterrupt:
         pass
+
+
+def _bind(host: str, port: int):
+    import socket
+    family = socket.AF_INET6 if ":" in host else socket.AF_INET
+    sock = socket.socket(family, socket.SOCK_STREAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        sock.bind((host, port))
+    except OSError as e:
+        sock.close()
+        raise CliError(f"cannot listen on {host}:{port}: {e.strerror}") from None
+    sock.listen(128)
+    sock.set_inheritable(True)
+    return sock
 
 
 def _open_browser(url: str) -> None:
