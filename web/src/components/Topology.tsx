@@ -334,7 +334,7 @@ function Graph(props: Props) {
       elementsSelectable
       deleteKeyCode={editable ? ["Delete", "Backspace"] : null}
       fitView
-      fitViewOptions={{ padding: 0.25, maxZoom: 1.2 }}
+      fitViewOptions={{ padding: 0.08, maxZoom: 1.2 }}
       minZoom={0.2}
       onNodeClick={(_, n) => onSelect({ type: "node", id: n.id })}
       onEdgeClick={(_, e) => onSelect({ type: "link", id: e.id, index: (e.data as NetEdgeData).index })}
@@ -372,7 +372,7 @@ function Graph(props: Props) {
           <span style={{ width: 1, background: "var(--border)", margin: "2px 2px" }} />
           <button className="btn small ghost" title="Arrange automatically" onClick={() => {
             props.onMove?.(autoLayout(data));
-            setTimeout(() => rf.fitView({ padding: 0.25, duration: 300, maxZoom: 1.2 }), 50);
+            setTimeout(() => rf.fitView({ padding: 0.08, duration: 300, maxZoom: 1.2 }), 50);
           }}>
             <LayoutGrid size={14} />
           </button>
