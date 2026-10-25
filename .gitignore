@@ -8,3 +8,4 @@ dist/
 web/node_modules/
 netsim/web/
 *.pcap
+web/tsconfig.tsbuildinfo
