@@ -209,7 +209,7 @@ def create_app(engine: Engine, token: str, check_host: bool = True) -> FastAPI:
     async def put_profile(name: str, body: TextBody):
         profiles.save(name, body.text)
         engine.bus.publish("profiles", {"changed": name})
-        return profile_summary(name)
+        return {**profile_summary(name), "reapplied": await engine.profile_saved(name)}
 
     @app.post("/api/profiles/{name}/rename")
     async def rename_profile(name: str, body: RenameBody):
@@ -250,8 +250,9 @@ def create_app(engine: Engine, token: str, check_host: bool = True) -> FastAPI:
     @app.put("/api/labs/{name}")
     async def put_lab(name: str, body: TextBody):
         labs.save(name, body.text, ephemeral=labs.is_ephemeral(name))
+        result = await engine.adopt(name, body.text) if name in engine.running else {"live": [], "restart": False}
         engine._labs_changed()
-        return {"ok": True}
+        return {"ok": True, **result}
 
     @app.post("/api/labs/{name}/rename")
     async def rename_lab(name: str, body: RenameBody):

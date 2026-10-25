@@ -30,7 +30,7 @@ from netsim.bus import Bus
 from netsim.capture import PacketCapture
 from netsim.config import User, invoking_user, lookup_user
 from netsim.distributions import install as install_distributions
-from netsim.models import Lab, Program, Proxy, ShapeParams, parse_hostport
+from netsim.models import Lab, Link, Program, Proxy, ShapeParams, parse_hostport
 from netsim.process import LineSplitter, PtyProcess, kill_tree, stream_lines
 from netsim.proxy import Endpoint, ProxySpec, make_proxy
 from netsim.shaping import Direction, LinkShape, NetemSpec, ShapingError, flatten_profile, netem
@@ -66,10 +66,13 @@ class LinkState:
     step_until: float | None = None
     applied: dict[str, NetemSpec] = field(default_factory=dict)
     task: asyncio.Task | None = None
+    # serialises tc changes: a timeline step and a user change must not interleave
+    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
     def to_json(self):
         return {
             "profile": self.profile_name,
+            "file_profile": self.shape.link.profile,
             "runtime": self.shape.runtime,
             "timeline": bool(self.shape.profile and self.shape.profile.timeline),
             "step": self.step, "step_label": self.step_label,
@@ -607,20 +610,23 @@ class Engine:
 
     async def _apply(self, rt: LabRuntime, link_id: str) -> None:
         ls = rt.links[link_id]
-        lp = rt.plan.links[link_id]
-        step = None
-        if ls.step is not None and ls.shape.profile and ls.shape.profile.timeline:
-            step = ls.shape.profile.timeline.steps[ls.step]
-        for direction, end in (("up", lp.a), ("down", lp.b)):
-            spec = netem(ls.shape.effective(direction, step))
-            prev = ls.applied.get(direction)
-            if prev and prev.args == spec.args:
-                continue
-            ns = rt.iface_ns(end.node)
-            if prev and prev.sticky != spec.sticky:
-                await rt.runner.tc(ns, "qdisc", "del", "dev", end.name, "root", check=False)
-            await rt.runner.tc(ns, *spec.tc(end.name))
-            ls.applied[direction] = spec
+        async with ls.lock:
+            lp = rt.plan.links[link_id]
+            step = None
+            if ls.step is not None and ls.shape.profile and ls.shape.profile.timeline:
+                step = ls.shape.profile.timeline.steps[ls.step]
+            for direction, end in (("up", lp.a), ("down", lp.b)):
+                spec = netem(ls.shape.effective(direction, step))
+                prev = ls.applied.get(direction)
+                if prev and prev.args == spec.args:
+                    continue
+                ns = rt.iface_ns(end.node)
+                # forget what was applied until tc succeeds, so a failure is retried next time
+                ls.applied.pop(direction, None)
+                if prev and prev.sticky != spec.sticky:
+                    await rt.runner.tc(ns, "qdisc", "del", "dev", end.name, "root", check=False)
+                await rt.runner.tc(ns, *spec.tc(end.name))
+                ls.applied[direction] = spec
 
     async def _timeline(self, rt: LabRuntime, link_id: str) -> None:
         ls = rt.links[link_id]
@@ -644,48 +650,123 @@ class Engine:
         except Exception as e:  # noqa: BLE001 - keep the lab alive, report the problem
             self.event(rt, "error", f"{link_id}: timeline stopped: {e}")
 
+    async def _stop_timeline(self, ls: LinkState) -> None:
+        if ls.task:
+            ls.task.cancel()
+            await asyncio.gather(ls.task, return_exceptions=True)
+            ls.task = None
+        ls.step = ls.step_label = ls.step_until = None
+
+    async def _reconfigure(self, rt: LabRuntime, link_id: str, profile: str | None, link: Link | None = None,
+                           reset_overrides: bool = True) -> None:
+        """Switch a link to another profile and/or link definition, restarting its timeline."""
+        ls = rt.links[link_id]
+        try:
+            new_profile = flatten_profile(profile, self.profiles.get) if profile else None
+        except KeyError:
+            raise EngineError(f"unknown profile {profile!r}") from None
+        except (StoreError, ShapingError) as e:
+            raise EngineError(f"profile {profile}: {e}") from None
+        candidate = LinkShape(new_profile, link or ls.shape.link,
+                              {"up": {}, "down": {}} if reset_overrides else ls.shape.runtime)
+        steps = new_profile.timeline.steps if new_profile and new_profile.timeline else [None]
+        try:
+            for step in steps:
+                for d in DIRECTIONS:
+                    netem(candidate.effective(d, step))
+        except (ShapingError, units.UnitError) as e:
+            raise EngineError(f"{link_id}: {e}") from None
+        await self._stop_timeline(ls)
+        ls.shape, ls.profile_name = candidate, profile or None
+        await self._apply(rt, link_id)
+        if new_profile and new_profile.timeline:
+            ls.task = asyncio.create_task(self._timeline(rt, link_id))
+
     async def set_link(self, name: str, link_id: str, *, profile: str | None | bool = False,
                        params: dict | None = None, reset: bool = False) -> dict:
-        """Change a running link. profile=False keeps it; params = {"both"|"up"|"down": {...}}."""
+        """Change a running link. profile=False keeps it; params = {"both"|"up"|"down": {...}}.
+
+        Switching profile drops live overrides (including a cut): the new profile is what you get.
+        """
         rt = self._rt(name)
         if link_id not in rt.links:
             raise EngineError(f"unknown link {link_id}")
         ls = rt.links[link_id]
-        old_profile = ls.shape.profile
         if profile is not False:
-            if profile:
-                try:
-                    ls.shape.profile = flatten_profile(profile, self.profiles.get)
-                except KeyError:
-                    raise EngineError(f"unknown profile {profile!r}") from None
-            else:
-                ls.shape.profile = None
-            ls.profile_name = profile or None
+            await self._reconfigure(rt, link_id, profile or None)
         if reset:
             ls.shape.runtime = {"up": {}, "down": {}}
         if params:
+            runtime = {d: dict(v) for d, v in ls.shape.runtime.items()}
             for key, values in params.items():
-                ShapeParams.model_validate(values)  # raises on bad input
+                ShapeParams.model_validate({k: v for k, v in values.items() if v is not None})
                 for d in (DIRECTIONS if key == "both" else (key,)):
-                    merged = {**ls.shape.runtime.get(d, {}), **values}
-                    ls.shape.runtime[d] = {k: v for k, v in merged.items() if v is not None}
-        try:
-            for d in DIRECTIONS:
-                netem(ls.shape.effective(d))
-        except (ShapingError, units.UnitError) as e:
-            ls.shape.profile = old_profile
-            raise EngineError(str(e)) from None
-        if profile is not False:
-            if ls.task:
-                ls.task.cancel()
-                ls.task = None
-            ls.step = ls.step_label = ls.step_until = None
-            if ls.shape.profile and ls.shape.profile.timeline:
-                ls.task = asyncio.create_task(self._timeline(rt, link_id))
+                    merged = {**runtime.get(d, {}), **values}
+                    runtime[d] = {k: v for k, v in merged.items() if v is not None}
+            try:
+                for d in DIRECTIONS:
+                    netem(LinkShape(ls.shape.profile, ls.shape.link, runtime).effective(d))
+            except (ShapingError, units.UnitError) as e:
+                raise EngineError(str(e)) from None
+            ls.shape.runtime = runtime
         await self._apply(rt, link_id)
         self.event(rt, "info", f"{link_id}: {ls.applied['up'].summary} / {ls.applied['down'].summary}")
         self._changed(rt)
         return ls.to_json()
+
+    async def adopt(self, name: str, text: str) -> dict:
+        """A running lab's file was saved: apply what can change live, report the rest.
+
+        Profiles and shaping fields of links, descriptions and layout apply immediately;
+        anything else (nodes, wiring, addresses, programs, proxies) needs a restart.
+        """
+        rt = self.running.get(name)
+        if not rt:
+            return {"live": [], "restart": False}
+        new = parse_yaml(text, Lab, name)
+        old = rt.lab
+
+        def wiring(lab: Lab):
+            return (lab.model_dump(exclude={"description", "layout", "links", "name"}),
+                    [(lk.a, lk.b, lk.name, lk.subnet, lk.ip_a, lk.ip_b, lk.mtu) for lk in lab.links])
+
+        if wiring(new) != wiring(old):
+            return {"live": [], "restart": True}
+        changed = []
+        for new_link, old_link in zip(new.links, old.links):
+            if new_link.model_dump() != old_link.model_dump():
+                same_profile = new_link.profile == old_link.profile
+                await self._reconfigure(rt, new_link.id, new_link.profile, new_link, reset_overrides=not same_profile)
+                changed.append(new_link.id)
+        rt.lab, rt.source_text = new, text
+        for link_id in changed:
+            ls = rt.links[link_id]
+            self.event(rt, "info", f"{link_id}: saved change applied live - {ls.applied['up'].summary}")
+        self._changed(rt)
+        self._labs_changed()
+        return {"live": changed, "restart": False}
+
+    async def profile_saved(self, profile: str) -> list[str]:
+        """Re-apply running links whose profile (or one it extends) changed on disk."""
+        touched = []
+        for rt in list(self.running.values()):
+            for link_id, ls in rt.links.items():
+                if not ls.profile_name:
+                    continue
+                try:
+                    fresh = flatten_profile(ls.profile_name, self.profiles.get)
+                except (KeyError, StoreError, ShapingError):
+                    continue
+                if ls.shape.profile is None or fresh.model_dump() != ls.shape.profile.model_dump():
+                    try:
+                        await self._reconfigure(rt, link_id, ls.profile_name, reset_overrides=False)
+                    except EngineError as e:
+                        self.event(rt, "error", f"{link_id}: updated profile {profile} not applied: {e}")
+                        continue
+                    self.event(rt, "info", f"{link_id}: profile {ls.profile_name} updated on disk, re-applied")
+                    touched.append(f"{rt.name}/{link_id}")
+                    self._changed(rt)
+        return touched
 
     # ---------------------------------------------------------------- programs
 
