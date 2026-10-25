@@ -49,6 +49,7 @@ interface NetEdgeData extends Record<string, unknown> {
   drops: number;
   cut: boolean;
   step?: string | null;
+  title?: string;
 }
 
 const NODE_W = 172;
@@ -162,7 +163,7 @@ const NetEdge = memo(function NetEdge({ id, source, target, data, selected }: Ed
   const labelClass = `edge-label nodrag nopan ${selected ? "selected" : ""} ${data.cut ? "cut" : ""}`;
   const label = (
     <EdgeLabelRenderer>
-      <div className={labelClass} style={{ transform: `translate(-50%, -50%) translate(${mx}px, ${my}px)` }}>
+      <div className={labelClass} title={data.title} style={{ transform: `translate(-50%, -50%) translate(${mx}px, ${my}px)` }}>
         {data.live ? (
           <>
             {data.cut ? (
@@ -292,7 +293,8 @@ function Graph(props: Props) {
             data: {
               index,
               label: l.name ? `${l.name}: ${profile}` : profile,
-              sub: overrides.length ? `+ ${overrides.join(", ")}` : plan?.links[id]?.shaping?.up,
+              sub: overrides.length ? `+ ${overrides.join(", ")}` : undefined,
+              title: plan?.links[id]?.shaping ? `a→b: ${plan.links[id].shaping!.up}\nb→a: ${plan.links[id].shaping!.down}` : undefined,
               live,
               upBps: st?.up?.bps ?? 0,
               downBps: st?.down?.bps ?? 0,

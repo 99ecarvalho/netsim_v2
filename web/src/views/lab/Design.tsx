@@ -2,7 +2,7 @@ import { CheckCircle2, CircleAlert } from "lucide-react";
 import YAML from "yaml";
 import { useCallback, useState } from "react";
 import CodeEditor, { type LineDiagnostic } from "../../components/CodeEditor";
-import Topology, { type Selection } from "../../components/Topology";
+import Topology, { autoLayout, type Selection } from "../../components/Topology";
 import { Split } from "../../components/ui";
 import { addLink, addNode, freeName, removeLink, removeNode, serialize, setLayout, type ParsedLab } from "../../lib/labdoc";
 import { useStore } from "../../lib/store";
@@ -26,6 +26,16 @@ export default function Design({ name, text, parsed, plan, validation, diagnosti
   const [selection, setSelection] = useState<Selection>(null);
   const profiles = useStore((s) => s.profiles);
   const data = parsed.data;
+
+  /** Positions for every node, so the first manual placement doesn't make the others jump. */
+  const withFullLayout = useCallback(
+    (pos: Record<string, { x: number; y: number }>) => {
+      const names = Object.keys(data.nodes ?? {});
+      if (names.every((n) => data.layout?.[n])) return pos;
+      return { ...autoLayout(data), ...(data.layout ?? {}), ...pos };
+    },
+    [data],
+  );
 
   /** Apply a mutation to the YAML document and push the new text. */
   const mutate = useCallback(
@@ -91,13 +101,14 @@ export default function Design({ name, text, parsed, plan, validation, diagnosti
           editable
           selection={selection}
           onSelect={setSelection}
-          onMove={(pos) => mutate((d) => setLayout(d, pos))}
+          onMove={(pos) => mutate((d) => setLayout(d, withFullLayout(pos)))}
           onConnect={(a, b) => mutate((d) => {
             const idx = addLink(d, a, b);
             setTimeout(() => setSelection({ type: "link", id: `${a}--${b}`, index: idx }), 0);
           })}
           onAdd={(kind: NodeKind, pos) => mutate((d) => {
             const n = freeName(data, kind);
+            setLayout(d, withFullLayout({}));
             addNode(d, n, kind, pos);
             setTimeout(() => setSelection({ type: "node", id: n }), 0);
           })}
