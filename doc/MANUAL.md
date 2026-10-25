@@ -39,7 +39,7 @@ You drive it from the terminal (`netsim ...`) or from a web page.
 
 ## 2. Install and start
 
-You need Linux, `sudo`, Python 3.12 or newer, and Node.js 18 or newer (to build the web page).
+You need Linux, `sudo`, Python 3.12 or newer, and Node.js 20.19 or newer (to build the web page).
 `ip`, `tc` and `nft` come with most distributions. `tcpdump`, `iperf3` and `docker` are optional.
 
 Clone the repository and start it:

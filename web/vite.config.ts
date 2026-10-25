@@ -7,7 +7,6 @@ const backend = process.env.NETSIM_URL ?? "http://127.0.0.1:8077";
 
 export default defineConfig({
   plugins: [react()],
-  esbuild: { target: "es2022" },
   build: {
     outDir: "../netsim/web",
     target: "es2022",

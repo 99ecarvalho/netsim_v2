@@ -22,7 +22,7 @@ Start here: [QUICKSTART.md](QUICKSTART.md) (copy-paste examples) and
 
 - Linux with `ip`/`tc` (iproute2), `nft`, `sudo`. Optional: `iptables` (hosts running Docker),
   `tcpdump` (packet summaries), `iperf3` and `ping` (probes), `docker`/`podman` (container nodes).
-- Python 3.12+, Node 18+ to build the web UI.
+- Python 3.12+, Node 20.19+ (or 22.12+) to build the web UI.
 - Root, via sudo. netsim elevates itself when needed and runs your programs as your own user.
 
 ## Install
