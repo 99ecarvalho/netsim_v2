@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (C) 2026 Eduardo Correia
 import { CheckCircle2, CircleAlert } from "lucide-react";
 import YAML from "yaml";
 import { useCallback, useState } from "react";

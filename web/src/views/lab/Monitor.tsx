@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (C) 2026 Eduardo Correia
 import { Copy, Scissors, Undo2, Zap } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import Chart, { type SeriesDef } from "../../components/Chart";

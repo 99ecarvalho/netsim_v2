@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (C) 2026 Eduardo Correia
 export type NodeKind = "host" | "router" | "switch" | "external" | "container";
 export type Direction = "up" | "down";
 

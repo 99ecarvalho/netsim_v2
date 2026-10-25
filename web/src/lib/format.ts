@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (C) 2026 Eduardo Correia
 function short(n: number, digits: number): string {
   // 3 significant digits without exponent notation: 123, 12.3, 1.23
   const d = n >= 100 ? 0 : n >= 10 ? Math.max(0, digits - 2) : Math.max(0, digits - 1);

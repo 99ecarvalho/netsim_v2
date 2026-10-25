@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (C) 2026 Eduardo Correia
 /**
  * Edits to a lab expressed as mutations of its YAML document, so the text
  * editor and the graph editor share one source of truth and comments survive.

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright (C) 2026 Eduardo Correia
 """Command line interface. Most commands talk to the daemon started by `netsim serve`."""
 
 from __future__ import annotations

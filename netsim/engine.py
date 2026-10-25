@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright (C) 2026 Eduardo Correia
 """Runtime: builds labs on the host and keeps them alive.
 
 One Engine per daemon. Every running lab has a LabRuntime holding its compiled

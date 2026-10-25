@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (C) 2026 Eduardo Correia
 import React from "react";
 import { createRoot } from "react-dom/client";
 import "@xyflow/react/dist/style.css";

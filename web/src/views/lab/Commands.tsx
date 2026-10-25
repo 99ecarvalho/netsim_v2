@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (C) 2026 Eduardo Correia
 import { Copy } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, enc } from "../../lib/api";

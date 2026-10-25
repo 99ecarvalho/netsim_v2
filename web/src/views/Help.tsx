@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (C) 2026 Eduardo Correia
 const PROFILE_FIELDS: [string, string, string][] = [
   ["delay", "40ms", "mean one-way delay; RTT over a link is roughly 2×"],
   ["jitter", "10ms", "delay variation: ±range for uniform, std-dev for other distributions"],

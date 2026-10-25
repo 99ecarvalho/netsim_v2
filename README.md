@@ -212,4 +212,6 @@ contrib/           systemd unit
 
 ## License
 
-MIT
+netsim is free software, licensed under the GNU Lesser General Public License v3.0 or later
+([COPYING.LESSER](COPYING.LESSER), which builds on the GPL v3 in [COPYING](COPYING)).
+Contributions: [CONTRIBUTING.md](CONTRIBUTING.md). Security: [SECURITY.md](SECURITY.md).

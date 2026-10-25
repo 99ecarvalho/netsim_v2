@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright (C) 2026 Eduardo Correia
 """Generate netem delay distribution tables.
 
 iproute2 ships normal, pareto, paretonormal and experimental tables. We generate

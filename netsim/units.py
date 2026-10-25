@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright (C) 2026 Eduardo Correia
 """Parsing of human-friendly quantities: durations, rates, percentages, sizes.
 
 Conventions (explicit, because tc's own are a trap: in tc "mbps" means megaBYTES):

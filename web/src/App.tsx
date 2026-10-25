@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (C) 2026 Eduardo Correia
 import { BookOpen, FileCode2, Home, Moon, Network, PanelLeft, Sun, SunMoon, Wifi, WifiOff, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "./lib/api";

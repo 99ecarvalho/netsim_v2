@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright (C) 2026 Eduardo Correia
 """Packet capture on a lab interface.
 
 We capture ourselves with an AF_PACKET socket opened inside the namespace and

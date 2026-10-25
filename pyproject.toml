@@ -4,8 +4,19 @@ version = "2.0.0"
 description = "Virtual network labs with traffic shaping for testing networked programs"
 readme = "README.md"
 requires-python = ">=3.12"
-license = { text = "MIT" }
+license = "LGPL-3.0-or-later"
+license-files = ["COPYING", "COPYING.LESSER"]
 authors = [{ name = "Eduardo Correia" }]
+keywords = ["network", "emulation", "netem", "traffic-shaping", "namespaces", "testing"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Web Environment",
+    "Intended Audience :: Developers",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Topic :: System :: Networking",
+    "Topic :: Software Development :: Testing",
+]
 dependencies = [
     "fastapi>=0.110",
     "uvicorn[standard]>=0.29",
@@ -21,7 +32,7 @@ dev = ["pytest>=8", "pytest-asyncio>=0.23"]
 netsim = "netsim.cli:main"
 
 [build-system]
-requires = ["setuptools>=69"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]

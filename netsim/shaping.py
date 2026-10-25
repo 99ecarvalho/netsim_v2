@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright (C) 2026 Eduardo Correia
 """Turn profile/link parameters into netem configuration.
 
 Each direction of a link is shaped by a single netem qdisc at the egress of the

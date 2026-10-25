@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright (C) 2026 Eduardo Correia
 # netsim launcher: ./run.sh [start|stop|restart|status|build|logs]
 # Default (start): builds whatever is missing or outdated, starts the daemon in
 # the background and prints how to open the web UI.

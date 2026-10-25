@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (C) 2026 Eduardo Correia
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { wsUrl } from "./api";
 

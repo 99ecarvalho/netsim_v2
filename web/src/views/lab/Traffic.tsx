@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (C) 2026 Eduardo Correia
 import { ArrowDownLeft, ArrowUpRight, Download, Pause, Play, Square, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Chart, { type SeriesDef } from "../../components/Chart";

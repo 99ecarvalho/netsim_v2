@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright (C) 2026 Eduardo Correia
 """TCP/UDP relays that push one specific conversation through a lab.
 
     app --> [listen, listen_ns] ==daemon==> entry node socket ~~shaped~~>

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright (C) 2026 Eduardo Correia
 """Parsers for the text output of tcpdump, ping, iperf3 and ss."""
 
 from __future__ import annotations

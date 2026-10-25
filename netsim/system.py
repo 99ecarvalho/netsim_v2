@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright (C) 2026 Eduardo Correia
 """Thin async wrappers over ip/tc/nft/iptables plus namespace-aware sockets."""
 
 from __future__ import annotations

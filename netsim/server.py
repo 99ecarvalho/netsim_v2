@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright (C) 2026 Eduardo Correia
 """HTTP + WebSocket API and the web UI.
 
 The daemon runs as root and can start arbitrary programs, so every request must

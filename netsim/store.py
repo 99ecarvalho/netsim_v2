@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright (C) 2026 Eduardo Correia
 """YAML-backed storage for profiles and labs (one file per object)."""
 
 from __future__ import annotations

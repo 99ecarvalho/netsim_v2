@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright (C) 2026 Eduardo Correia
 """Child processes attached to a pseudo-terminal.
 
 A pty makes programs line-buffer their output (so logs are live) and gives

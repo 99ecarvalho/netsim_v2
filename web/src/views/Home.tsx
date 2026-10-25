@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Copyright (C) 2026 Eduardo Correia
 import { Copy, Network, Play, Plus, Square } from "lucide-react";
 import { createLab, labAction } from "../components/Sidebar";
 import { useStore } from "../lib/store";

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+# Copyright (C) 2026 Eduardo Correia
 """Data models for profiles (link behaviour) and labs (topologies)."""
 
 from __future__ import annotations
