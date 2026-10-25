@@ -64,6 +64,7 @@ class _Base:
         self.stats = ProxyStats()
         self.on_event = on_event or (lambda *a: None)
         self._tasks: set[asyncio.Task] = set()
+        self._writers: set[asyncio.StreamWriter] = set()  # open connections, closed on stop()
 
     def _spawn(self, coro):
         t = asyncio.create_task(coro)
@@ -85,25 +86,46 @@ def _bind(ns: str | None, host: str, port: int, kind: int) -> socket.socket:
 
 
 class TcpProxy(_Base):
+    _server = _relay = None
+
     async def start(self):
         sp = self.spec
-        self._listener = _bind(sp.listen.ns, sp.listen.host, sp.listen.port, socket.SOCK_STREAM)
-        self._listener.listen(128)
-        self._server = await asyncio.start_server(self._client, sock=self._listener)
-        self._relay = None
-        if not sp.direct:
-            relay_sock = _bind(sp.exit_ns, sp.exit_ip, 0, socket.SOCK_STREAM)
-            relay_sock.listen(128)
-            self._relay_addr = relay_sock.getsockname()
-            self._relay = await asyncio.start_server(self._exit_side, sock=relay_sock)
+        try:
+            listener = _bind(sp.listen.ns, sp.listen.host, sp.listen.port, socket.SOCK_STREAM)
+            listener.listen(128)
+            self._server = await asyncio.start_server(self._tracked(self._client), sock=listener)
+            if not sp.direct:
+                relay_sock = _bind(sp.exit_ns, sp.exit_ip, 0, socket.SOCK_STREAM)
+                relay_sock.listen(128)
+                self._relay_addr = relay_sock.getsockname()
+                self._relay = await asyncio.start_server(self._tracked(self._exit_side), sock=relay_sock)
+        except BaseException:
+            await self.stop()  # do not leave a listener behind when the relay cannot be created
+            raise
+
+    def _tracked(self, handler):
+        """Register each connection's task so stop() can end it."""
+        async def run(reader, writer):
+            task = asyncio.current_task()
+            self._tasks.add(task)
+            self._writers.add(writer)
+            try:
+                await handler(reader, writer)
+            finally:
+                self._tasks.discard(task)
+                self._writers.discard(writer)
+        return run
 
     async def stop(self):
         for srv in (self._server, self._relay):
             if srv:
                 srv.close()
+        for w in list(self._writers):
+            w.close()
         for t in list(self._tasks):
             t.cancel()
         await asyncio.gather(*self._tasks, return_exceptions=True)
+        self.stats.active = 0
 
     async def _connect(self, ns: str | None, host: str, port: int):
         s = socket_in_ns(ns, socket.AF_INET, socket.SOCK_STREAM)
@@ -125,9 +147,14 @@ class TcpProxy(_Base):
             except (OSError, asyncio.TimeoutError) as e:
                 self._fail(f"connect from entry node to {dest[0]}:{dest[1]}: {e or 'timeout'}")
                 return
-            await _splice(c_reader, c_writer, u_reader, u_writer, self.stats)
+            self._writers.add(u_writer)
+            try:
+                await _splice(c_reader, c_writer, u_reader, u_writer, self.stats)
+            finally:
+                self._writers.discard(u_writer)
+                u_writer.close()
         finally:
-            self.stats.active -= 1
+            self.stats.active = max(0, self.stats.active - 1)
             c_writer.close()
 
     async def _exit_side(self, r_reader, r_writer):
@@ -138,7 +165,12 @@ class TcpProxy(_Base):
             except (OSError, asyncio.TimeoutError) as e:
                 self._fail(f"connect to target {sp.target.host}:{sp.target.port}: {e or 'timeout'}")
                 return
-            await _splice(r_reader, r_writer, t_reader, t_writer, None)
+            self._writers.add(t_writer)
+            try:
+                await _splice(r_reader, r_writer, t_reader, t_writer, None)
+            finally:
+                self._writers.discard(t_writer)
+                t_writer.close()
         finally:
             r_writer.close()
 
@@ -273,8 +305,11 @@ class UdpProxy(_Base):
             self.stats.active = len(self.sessions)
 
     async def stop(self):
+        if getattr(self, "listener", None) is None:
+            return
         self.loop.remove_reader(self.listener)
         self.listener.close()
+        self.listener = None
         for sess in self.sessions.values():
             sess.close()
         self.sessions.clear()
