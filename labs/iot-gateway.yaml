@@ -1,0 +1,23 @@
+description: >
+  Field site: two sensors on a local network behind a gateway whose uplink is
+  a flaky cellular link to a cloud server. The external node gives the lab
+  internet access through the host.
+nodes:
+  sensor1: {icon: iot}
+  sensor2: {icon: iot}
+  lan: {kind: switch}
+  gateway: {kind: router, icon: router}
+  cloud: {icon: cloud}
+  host: {kind: external, internet: true}
+links:
+  - {a: sensor1, b: lan, profile: lan-100m}
+  - {a: sensor2, b: lan, profile: wifi-busy}
+  - {a: gateway, b: lan, profile: lan-100m}
+  - {a: gateway, b: cloud, profile: gsm-flaky, name: uplink}
+  - {a: gateway, b: host, profile: ideal}
+programs:
+  - name: api
+    node: cloud
+    cmd: python3 -m http.server 8080
+    autostart: true
+    restart: on-failure

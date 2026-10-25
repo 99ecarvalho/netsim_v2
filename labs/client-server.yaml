@@ -1,0 +1,13 @@
+description: >
+  Simplest setup - one client, one server, one shaped link. Change the
+  profile and watch your program cope.
+nodes:
+  client: {icon: laptop}
+  server: {icon: server}
+links:
+  - {a: client, b: server, profile: 4g-lte}
+programs:
+  - name: http
+    node: server
+    cmd: python3 -m http.server 8000 --bind 0.0.0.0
+    autostart: true
