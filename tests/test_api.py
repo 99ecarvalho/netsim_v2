@@ -50,6 +50,13 @@ async def test_validate_without_name(client):
     ("delay: .nan", False),
     ("delay: .inf", False),
     ("rate: .inf", False),
+    ("delay: 1e309ms", False),
+    ("delay: 1e308h", False),
+    ("rate: 1e400mbit", False),
+    ("rate: 1e308gbit", False),
+    ("queue: 1e309s\nrate: 1mbit", False),
+    ("slot: {min: 1ms, bytes: 1e30mb}", False),
+    ("delay: 1h", True),
 ])
 async def test_profile_validation_edge_cases(client, text, ok):
     r = await client.post("/api/profiles/validate", json={"text": text})

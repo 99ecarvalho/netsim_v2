@@ -45,7 +45,18 @@ def _split(value: str, what: str) -> tuple[float, str]:
     m = re.fullmatch(_NUM + r"\s*([a-zA-Zµ/%]*)", value.strip())
     if not m:
         raise UnitError(f"invalid {what}: {value!r}")
-    return float(m.group(1)), m.group(2).lower()
+    return _finite(float(m.group(1)), what, value), m.group(2).lower()
+
+
+# far above anything netem accepts, far below float overflow
+_LIMITS = {"duration": 10 * 365 * 24 * 3_600_000.0, "rate": 1e15, "size": 2.0**53}
+
+
+def _finite(x: float, what: str, original) -> float:
+    """Checked after parsing and again after applying the unit: '1e309ms' and '1e308h' overflow."""
+    if not math.isfinite(x) or x > _LIMITS.get(what, math.inf):
+        raise UnitError(f"{what} out of range: {original!r}")
+    return x
 
 
 def _number(value, what: str) -> float:
@@ -54,7 +65,7 @@ def _number(value, what: str) -> float:
         raise UnitError(f"invalid {what}: {value!r}")
     if not math.isfinite(value) or value < 0:
         raise UnitError(f"{what} must be a finite, non-negative number: {value!r}")
-    return float(value)
+    return _finite(float(value), what, value)
 
 
 def parse_duration(value: str | int | float) -> float:
@@ -64,7 +75,7 @@ def parse_duration(value: str | int | float) -> float:
     num, unit = _split(value, "duration")
     if unit not in _DURATION_UNITS:
         raise UnitError(f"unknown duration unit {unit!r} in {value!r} (use us, ms, s, min)")
-    return num * _DURATION_UNITS[unit]
+    return _finite(num * _DURATION_UNITS[unit], "duration", value)
 
 
 def parse_rate(value: str | int | float) -> int:
@@ -75,7 +86,7 @@ def parse_rate(value: str | int | float) -> int:
     unit = unit.removesuffix("/s")
     if unit not in _RATE_UNITS:
         raise UnitError(f"unknown rate unit {unit!r} in {value!r} (use kbit, mbit, gbit)")
-    return int(num * _RATE_UNITS[unit])
+    return int(_finite(num * _RATE_UNITS[unit], "rate", value))
 
 
 def parse_percent(value: str | int | float) -> float:
@@ -99,7 +110,7 @@ def parse_size(value: str | int) -> int:
     num, unit = _split(value, "size")
     if unit not in _SIZE_UNITS:
         raise UnitError(f"unknown size unit {unit!r} in {value!r}")
-    return int(num * _SIZE_UNITS[unit])
+    return int(_finite(num * _SIZE_UNITS[unit], "size", value))
 
 
 def fmt_rate(bps: float) -> str:
