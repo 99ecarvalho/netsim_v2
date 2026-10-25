@@ -22,6 +22,11 @@ netsim up iot-gateway && netsim exec iot-gateway sensor1 -- ./agent
 
 ## Install
 
+Just trying it: `./run.sh` (builds what is missing, starts the daemon in the background, prints the
+UI link; `./run.sh stop|status|logs|build`) and follow [QUICKSTART.md](QUICKSTART.md).
+
+To keep it:
+
 ```sh
 make install          # builds the UI and installs `netsim` for your user (uv or pipx, editable)
 netsim serve --open   # starts the daemon (asks for sudo) and opens the UI
