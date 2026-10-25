@@ -414,6 +414,80 @@ def cmd_pipe(args) -> None:
             pass
 
 
+def _forward_specs(values: list[str], proto: str) -> list[dict]:
+    out = []
+    for v in values or []:
+        inner, _, outer = v.partition(":")
+        if not inner.isdigit() or (outer and not outer.isdigit()):
+            raise CliError(f"--forward takes PORT or PORT:HOSTPORT, got {v!r}")
+        out.append({"name": f"fwd-{proto}-{inner}", "proto": proto, "listen": f"127.0.0.1:{inner}",
+                    "listen_node": "app", "target": f"127.0.0.1:{outer or inner}", "via": ["app", "host"]})
+    return out
+
+
+def _local_proxy_ports() -> list[str]:
+    """Ports of http(s) proxies on localhost: inside a node localhost is the node itself."""
+    from urllib.parse import urlparse
+    ports = []
+    for var in ("http_proxy", "https_proxy", "all_proxy", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"):
+        url = os.environ.get(var)
+        if not url:
+            continue
+        u = urlparse(url if "://" in url else f"http://{url}")
+        if u.hostname in ("localhost", "127.0.0.1") and u.port and str(u.port) not in ports:
+            ports.append(str(u.port))
+    return ports
+
+
+def cmd_run(args) -> None:
+    """Run CMD in a throwaway node whose only way out is a shaped link to this machine."""
+    import yaml
+
+    if not args.cmd:
+        raise CliError("give a command: netsim run -p PROFILE -- CMD [ARGS...]")
+    name = args.name or f"run-{os.getpid()}"
+    forwards = list(args.forward or [])
+    proxy_ports = _local_proxy_ports()
+    forwards += [p for p in proxy_ports if p not in {f.split(":")[0] for f in forwards}]
+    link = {"a": "app", "b": "host", "profile": args.profile, **_params_from_args(args)}
+    lab = {"description": f"netsim run: {' '.join(args.cmd)[:80]}",
+           "nodes": {"app": {"icon": "laptop"}, "host": {"kind": "external", "internet": not args.no_internet}},
+           "links": [link],
+           "proxies": _forward_specs(forwards, "tcp") + _forward_specs(args.forward_udp, "udp")}
+    api = Api()
+    rt = api.post("/api/labs/ephemeral", {"name": name, "text": yaml.safe_dump(lab, sort_keys=False)})
+    code = 1
+    try:
+        for px in rt["proxies"].values():
+            if px["error"]:
+                raise CliError(f"forward {px['listen']}: {px['error']}")
+        host_ip = rt["plan"]["nodes"]["host"]["ip"]
+        if not args.quiet:
+            ls = rt["links"]["app--host"]
+            print(f"netsim: lab {name} · profile {args.profile} · this machine is 'host' ({host_ip})\n"
+                  f"netsim:   out {ls['up']['summary']}\nnetsim:   in  {ls['down']['summary']}", file=sys.stderr)
+            for px in rt["proxies"].values():
+                port = px["listen"].rsplit(":", 1)[1]
+                why = " (your http proxy)" if port in proxy_ports else ""
+                print(f"netsim:   localhost:{port} -> host {px['target']} ({px['proto']}){why}", file=sys.stderr)
+        argv = [sys.executable, "-m", "netsim", "exec", "--user-path", os.environ.get("PATH", ""), name, "app",
+                "--", *args.cmd]
+        if os.geteuid() != 0:
+            argv = ["sudo", "-E", *argv]
+        # the child gets Ctrl-C from the terminal; we only clean up after it
+        old = signal.signal(signal.SIGINT, signal.SIG_IGN)
+        try:
+            code = subprocess.call(argv)
+        finally:
+            signal.signal(signal.SIGINT, old)
+    finally:
+        try:
+            api.post(f"/api/labs/{name}/down")
+        except CliError:
+            pass
+    sys.exit(code)
+
+
 def cmd_validate(args) -> None:
     from netsim.models import Lab, Profile
     from netsim.store import StoreError, parse_yaml
@@ -517,6 +591,17 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--name", help="lab name (default pipe-<port>)")
     shaping_args(sp)
 
+    sp = add("run", cmd_run, "run a command through a shaped link: netsim run -p 3g-hspa -- curl URL")
+    sp.add_argument("-p", "--profile", default="4g-lte")
+    sp.add_argument("-f", "--forward", action="append", metavar="PORT[:HOSTPORT]",
+                    help="make localhost:PORT inside reach this machine's localhost:HOSTPORT through the link")
+    sp.add_argument("--forward-udp", action="append", metavar="PORT[:HOSTPORT]")
+    sp.add_argument("--no-internet", action="store_true", help="only this machine is reachable, no NAT")
+    sp.add_argument("--name", help="lab name (default run-<pid>)")
+    sp.add_argument("-q", "--quiet", action="store_true")
+    shaping_args(sp)
+    sp.add_argument("cmd", nargs=argparse.REMAINDER)
+
     sp = add("logs", cmd_logs, "print a lab program's output")
     sp.add_argument("lab")
     sp.add_argument("program")
@@ -537,7 +622,7 @@ def main(argv: list[str] | None = None) -> None:
     if not getattr(args, "fn", None):
         parser.print_help()
         return
-    if args.command == "exec" and args.cmd[:1] == ["--"]:
+    if args.command in ("exec", "run") and args.cmd[:1] == ["--"]:
         args.cmd = args.cmd[1:]
     try:
         args.fn(args)
