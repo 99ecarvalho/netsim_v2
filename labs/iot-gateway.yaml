@@ -16,6 +16,14 @@ links:
   - {a: gateway, b: cloud, profile: gsm-flaky, name: uplink}
   - {a: gateway, b: host, profile: ideal}
 programs:
+  - name: telemetry1
+    node: sensor1
+    cmd: while true; do curl -s -o /dev/null -w "%{http_code} %{time_total}s\n" http://cloud:8080/; sleep 2; done
+    autostart: true
+  - name: telemetry2
+    node: sensor2
+    cmd: while true; do curl -s -o /dev/null -w "%{http_code} %{time_total}s\n" http://cloud:8080/; sleep 3; done
+    autostart: true
   - name: api
     node: cloud
     cmd: python3 -m http.server 8080
