@@ -921,7 +921,7 @@ class Engine:
             if not pkt:
                 return
             cap.packets += 1
-            if local_ip and pkt.get("src"):
+            if "dir" not in pkt and local_ip and pkt.get("src"):
                 pkt["dir"] = "out" if pkt["src"] == local_ip else "in"
             if len(cap.pending) < 2000:
                 cap.pending.append(pkt)

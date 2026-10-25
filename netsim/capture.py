@@ -22,7 +22,10 @@ from netsim.system import socket_in_ns
 
 ETH_P_ALL = 0x0003
 SNAPLEN = 262144
-PCAP_HEADER = struct.pack("<IHHiIII", 0xA1B2C3D4, 2, 4, 0, 0, SNAPLEN, 1)  # linktype 1 = Ethernet
+# linktype 113 = Linux "cooked" (SLL): keeps whether a packet was received or sent,
+# so captures on routers show direction correctly (Wireshark shows it too)
+PCAP_HEADER = struct.pack("<IHHiIII", 0xA1B2C3D4, 2, 4, 0, 0, SNAPLEN, 113)
+ARPHRD_ETHER = 1
 
 
 class PacketCapture:
@@ -42,7 +45,7 @@ class PacketCapture:
     async def start(self) -> None:
         loop = asyncio.get_running_loop()
         self._dissector = await asyncio.create_subprocess_exec(
-            "tcpdump", "-r", "-", "-nn", "-tt", "-l", *self.display_filter.split(),
+            "tcpdump", "-r", "-", "-nn", "-tt", "-e", "-l", *self.display_filter.split(),
             stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
         self._dissector.stdin.write(PCAP_HEADER)
         await asyncio.sleep(0.2)
@@ -60,13 +63,17 @@ class PacketCapture:
     def _rx(self) -> None:
         while True:
             try:
-                data = self._sock.recv(SNAPLEN)
+                frame, addr = self._sock.recvfrom(SNAPLEN)
             except (BlockingIOError, InterruptedError):
                 return
             except OSError:
                 self._detach()
                 return
+            if len(frame) < 14:
+                continue
             ts = time.time_ns()
+            # SLL header: packet type, ARPHRD, address length, source MAC (8 bytes), ethertype
+            data = struct.pack(">HHH8s", addr[2], ARPHRD_ETHER, 6, frame[6:12]) + frame[12:14] + frame[14:]
             rec = struct.pack("<IIII", ts // 1_000_000_000, ts % 1_000_000_000 // 1000, len(data), len(data)) + data
             self.count += 1
             self.bytes += len(data)

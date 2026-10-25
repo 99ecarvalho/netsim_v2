@@ -20,7 +20,29 @@ def _split_addr(addr: str, v6: bool) -> tuple[str, int | None]:
     return addr, None
 
 
+_SLL = re.compile(r"^(\d+\.\d+)\s+(In|Out|B|M|P)\s+\S+\s+ethertype (\S+) \(0x[0-9a-f]+\), length \d+: (.*)$")
+_DIRS = {"In": "in", "Out": "out", "B": "in", "M": "in", "P": "in"}
+
+
 def tcpdump_line(line: str) -> dict | None:
+    """Parse `tcpdump -nn -tt` output; with `-e` on Linux cooked captures also the direction."""
+    direction = None
+    if m := _SLL.match(line):
+        ts, d, ethertype, rest = m.groups()
+        direction = _DIRS[d]
+        if ethertype == "IPv4":
+            line = f"{ts} IP {rest}"
+        elif ethertype == "IPv6":
+            line = f"{ts} IP6 {rest}"
+        else:
+            line = f"{ts} {ethertype}, {rest}"
+    pkt = _tcpdump_plain(line)
+    if pkt is not None and direction:
+        pkt["dir"] = direction
+    return pkt
+
+
+def _tcpdump_plain(line: str) -> dict | None:
     m = _TCPDUMP_IP.match(line)
     if m:
         ts, fam, src, dst, info = m.groups()

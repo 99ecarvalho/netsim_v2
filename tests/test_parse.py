@@ -15,6 +15,15 @@ def test_tcpdump():
     assert p["proto"] == "arp"
 
 
+def test_tcpdump_cooked_direction():
+    p = parse.tcpdump_line("1.000000 Out 02:00:00:00:00:01 ethertype IPv4 (0x0800), length 100: "
+                           "10.0.0.1.5000 > 10.0.0.2.40000: Flags [P.], seq 1:5, length 4")
+    assert p["dir"] == "out" and p["proto"] == "tcp" and p["sport"] == 5000
+    p = parse.tcpdump_line("1.000000  In 02:00:00:00:00:01 ethertype ARP (0x0806), length 44: "
+                           "Request who-has 10.0.0.2 tell 10.0.0.1, length 28")
+    assert p["dir"] == "in" and p["proto"] == "arp"
+
+
 def test_ping_iperf_ss():
     assert parse.ping_line("64 bytes from 10.0.0.2: icmp_seq=3 ttl=64 time=40.3 ms") == {"seq": 3, "rtt": 40.3}
     assert parse.ping_line("no answer yet for icmp_seq=5") == {"seq": 5, "rtt": None}
