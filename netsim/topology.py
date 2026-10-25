@@ -41,8 +41,19 @@ def lab_tag(lab_name: str) -> str:
     return hashlib.sha1(lab_name.encode()).hexdigest()[:5]
 
 
+NS_SEP = "@"  # allowed in neither lab nor node names, so (lab, node) maps to exactly one namespace
+
+
 def ns_name(lab_name: str, node: str, kind: str = "host") -> str:
-    return f"{ATTACHED_PREFIX if kind == 'container' else NS_PREFIX}{lab_name}-{node}"
+    return f"{ATTACHED_PREFIX if kind == 'container' else NS_PREFIX}{lab_name}{NS_SEP}{node}"
+
+
+def ns_lab(ns: str) -> str | None:
+    """Lab a netsim namespace belongs to, or None if it is not one of ours."""
+    for prefix in (NS_PREFIX, ATTACHED_PREFIX):
+        if ns.startswith(prefix) and NS_SEP in ns:
+            return ns[len(prefix):].rsplit(NS_SEP, 1)[0]
+    return None
 
 
 @dataclass

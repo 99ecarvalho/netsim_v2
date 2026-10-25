@@ -71,9 +71,17 @@ def test_container_node_keeps_its_default_route():
     p = compile_lab(lab(nodes={"c": {}, "api": {"kind": "container", "container": "web"},
                                "host": {"kind": "external"}},
                         links=[{"a": "c", "b": "api"}, {"a": "api", "b": "host"}]), "t", "10.201.0.0/16")
-    assert p.nodes["api"].ns == "netsimc-t-api"
+    assert p.nodes["api"].ns == "netsimc-t@api"
     assert p.nodes["api"].ifaces[0].name == "sim0"
     assert all(r.dst != "default" for r in p.nodes["api"].routes)
     assert any(r.dst == "default" for r in p.nodes["c"].routes)
     with pytest.raises(ValueError):
         lab(nodes={"api": {"kind": "container"}})
+
+
+def test_namespace_names_are_unambiguous():
+    from netsim.topology import ns_lab, ns_name
+    assert ns_name("foo-bar", "baz") != ns_name("foo", "bar-baz")
+    assert ns_lab(ns_name("foo-bar", "baz")) == "foo-bar"
+    assert ns_lab(ns_name("lab", "api", "container")) == "lab"
+    assert ns_lab("something-else") is None
