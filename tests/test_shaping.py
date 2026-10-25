@@ -79,3 +79,12 @@ def test_generated_tables_are_standardised(name):
     z = [v / distributions.SCALE for v in t]
     assert abs(statistics.fmean(z)) < 0.05
     assert 0.85 < statistics.pstdev(z) < 1.05  # clamping at 4 sigma trims a little
+
+
+def test_slot_without_max_and_bad_numbers():
+    assert "slot 1000us" in " ".join(netem({"slot": {"min": "1ms"}, "delay": "5ms"}).args)
+    for bad in (-1, float("nan"), float("inf")):
+        with pytest.raises(units.UnitError):
+            units.parse_duration(bad)
+    with pytest.raises(units.UnitError):
+        units.parse_rate(float("inf"))

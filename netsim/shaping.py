@@ -204,7 +204,7 @@ def netem(params: dict[str, Any]) -> NetemSpec:
 
     # netem's limit covers packets in flight (delayed) plus the bottleneck queue
     queue = queue_packets(p, rate)
-    span_ms = delay + 2 * jitter + (units.parse_duration(slot["max"] or slot["min"]) if slot else 0)
+    span_ms = delay + 2 * jitter + (units.parse_duration(slot.get("max") or slot["min"]) if slot else 0)
     if rate:
         in_flight = math.ceil(rate / 8 * span_ms / 1000 / AVG_PKT)
         limit = in_flight + (queue or 0)

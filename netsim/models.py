@@ -63,6 +63,12 @@ class Slot(_Strict):
     def _size(cls, v):
         return _check(units.parse_size, v)
 
+    @model_validator(mode="after")
+    def _order(self):
+        if self.max is not None and units.parse_duration(self.max) < units.parse_duration(self.min):
+            raise ValueError("slot max must be >= min")
+        return self
+
 
 class ShapeParams(_Strict):
     """Impairments applied to one direction of a link. All fields optional."""

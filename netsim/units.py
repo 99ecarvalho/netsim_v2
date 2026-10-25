@@ -9,6 +9,7 @@ Conventions (explicit, because tc's own are a trap: in tc "mbps" means megaBYTES
 
 from __future__ import annotations
 
+import math
 import re
 
 _NUM = r"([0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?)"
@@ -47,12 +48,19 @@ def _split(value: str, what: str) -> tuple[float, str]:
     return float(m.group(1)), m.group(2).lower()
 
 
+def _number(value, what: str) -> float:
+    """Plain numbers from YAML: must be finite and not negative (rejects -1, .nan, .inf)."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise UnitError(f"invalid {what}: {value!r}")
+    if not math.isfinite(value) or value < 0:
+        raise UnitError(f"{what} must be a finite, non-negative number: {value!r}")
+    return float(value)
+
+
 def parse_duration(value: str | int | float) -> float:
     """Return milliseconds."""
-    if isinstance(value, bool):
-        raise UnitError(f"invalid duration: {value!r}")
-    if isinstance(value, (int, float)):
-        return float(value)
+    if not isinstance(value, str):
+        return _number(value, "duration")
     num, unit = _split(value, "duration")
     if unit not in _DURATION_UNITS:
         raise UnitError(f"unknown duration unit {unit!r} in {value!r} (use us, ms, s, min)")
@@ -61,10 +69,8 @@ def parse_duration(value: str | int | float) -> float:
 
 def parse_rate(value: str | int | float) -> int:
     """Return bits per second."""
-    if isinstance(value, bool):
-        raise UnitError(f"invalid rate: {value!r}")
-    if isinstance(value, (int, float)):
-        return int(value)
+    if not isinstance(value, str):
+        return int(_number(value, "rate"))
     num, unit = _split(value, "rate")
     unit = unit.removesuffix("/s")
     if unit not in _RATE_UNITS:
@@ -74,10 +80,8 @@ def parse_rate(value: str | int | float) -> int:
 
 def parse_percent(value: str | int | float) -> float:
     """Return percent in [0, 100]."""
-    if isinstance(value, bool):
-        raise UnitError(f"invalid percentage: {value!r}")
-    if isinstance(value, (int, float)):
-        pct = float(value)
+    if not isinstance(value, str):
+        pct = _number(value, "percentage")
     else:
         num, unit = _split(value, "percentage")
         if unit not in ("", "%"):
@@ -90,10 +94,8 @@ def parse_percent(value: str | int | float) -> float:
 
 def parse_size(value: str | int) -> int:
     """Return bytes."""
-    if isinstance(value, bool):
-        raise UnitError(f"invalid size: {value!r}")
-    if isinstance(value, (int, float)):
-        return int(value)
+    if not isinstance(value, str):
+        return int(_number(value, "size"))
     num, unit = _split(value, "size")
     if unit not in _SIZE_UNITS:
         raise UnitError(f"unknown size unit {unit!r} in {value!r}")
