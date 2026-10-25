@@ -244,7 +244,9 @@ def create_app(engine: Engine, token: str, check_host: bool = True) -> FastAPI:
             return {"ok": True, "plan": await engine.preview(lab, name)}
         except StoreError as e:
             return {"ok": False, "error": str(e), "details": e.details}
-        except (EngineError, ValueError) as e:
+        except EngineError as e:
+            return {"ok": False, "error": str(e), "details": [{"loc": e.loc, "msg": str(e)}] if e.loc else []}
+        except ValueError as e:
             return {"ok": False, "error": str(e), "details": []}
 
     @app.put("/api/labs/{name}")

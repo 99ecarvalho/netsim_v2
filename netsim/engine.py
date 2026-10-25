@@ -52,7 +52,9 @@ DIRECTIONS: tuple[Direction, Direction] = ("up", "down")
 
 
 class EngineError(Exception):
-    pass
+    def __init__(self, message: str, loc: str | None = None):
+        super().__init__(message)
+        self.loc = loc  # path in the lab file, e.g. "links.2.profile", when known
 
 
 # ------------------------------------------------------------------ runtime state
@@ -342,15 +344,15 @@ class Engine:
 
     def link_shapes(self, lab: Lab) -> dict[str, LinkShape]:
         shapes = {}
-        for link in lab.links:
+        for index, link in enumerate(lab.links):
             prof = None
             if link.profile:
                 try:
                     prof = flatten_profile(link.profile, self.profiles.get)
                 except KeyError:
-                    raise EngineError(f"link {link.id}: unknown profile {link.profile!r}") from None
+                    raise EngineError(f"link {link.id}: unknown profile {link.profile!r}", f"links.{index}.profile") from None
                 except (StoreError, ShapingError) as e:
-                    raise EngineError(f"link {link.id}: profile {link.profile}: {e}") from None
+                    raise EngineError(f"link {link.id}: profile {link.profile}: {e}", f"links.{index}.profile") from None
             shape = LinkShape(prof, link)
             steps = prof.timeline.steps if prof and prof.timeline else [None]
             for step in steps:
@@ -358,7 +360,7 @@ class Engine:
                     try:
                         netem(shape.effective(d, step))
                     except (ShapingError, units.UnitError) as e:
-                        raise EngineError(f"link {link.id} ({d}): {e}") from None
+                        raise EngineError(f"link {link.id} ({d}): {e}", f"links.{index}") from None
             shapes[link.id] = shape
         return shapes
 
