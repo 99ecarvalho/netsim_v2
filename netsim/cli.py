@@ -200,7 +200,9 @@ def cmd_profiles(args) -> None:
 def _offline_profiles() -> list[dict]:
     from netsim.models import Link
     from netsim.shaping import LinkShape, flatten_profile, netem
+    from netsim.config import seed_home
     from netsim.store import ProfileStore
+    seed_home(home_dir())
     store = ProfileStore(home_dir() / "profiles")
     out = []
     for name in store.names():

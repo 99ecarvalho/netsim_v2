@@ -1,0 +1,13 @@
+include COPYING COPYING.LESSER README.md QUICKSTART.md CHANGELOG.md CONTRIBUTING.md SECURITY.md
+include run.sh Makefile setup.py
+recursive-include profiles *.yaml
+recursive-include labs *.yaml
+recursive-include netsim/web *
+recursive-include contrib *
+recursive-include doc *
+recursive-include web/src *
+include web/package.json web/package-lock.json web/tsconfig.json web/vite.config.ts web/index.html
+recursive-include web/public *
+recursive-include tests *.py
+prune web/node_modules
+global-exclude __pycache__ *.pyc

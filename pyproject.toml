@@ -39,7 +39,7 @@ build-backend = "setuptools.build_meta"
 include = ["netsim*"]
 
 [tool.setuptools.package-data]
-netsim = ["web/**/*"]
+netsim = ["web/**/*", "defaults/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

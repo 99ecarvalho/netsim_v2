@@ -1,7 +1,7 @@
 # netsim - build and install helpers
 PY ?= python3
 
-.PHONY: all web install dev serve test check clean service
+.PHONY: all web install dev serve test check clean service dist dist-check
 
 all: web
 
@@ -43,5 +43,19 @@ service:
 	sudo systemctl enable --now netsim
 	@echo "netsim is running as a service; open it with: netsim ui"
 
+# release artifacts: UI built first so the wheel carries it, then an install test in a clean venv
+dist: web
+	rm -rf dist build
+	uv build --sdist --wheel -o dist .
+	$(MAKE) dist-check
+
+dist-check:
+	@tmp=$$(mktemp -d) && trap 'rm -rf "$$tmp"' EXIT && \
+	uv venv -q "$$tmp/venv" && uv pip install -q -p "$$tmp/venv/bin/python" dist/*.whl && \
+	cd "$$tmp" && NETSIM_HOME="$$tmp/home" "$$tmp/venv/bin/netsim" profiles --offline >/dev/null && \
+	n=$$(ls "$$tmp/home/profiles" | wc -l) && labs=$$(ls "$$tmp/home/labs" | wc -l) && \
+	ui=$$("$$tmp/venv/bin/python" -c 'import netsim.config as c; print(c.web_dir() is not None)') && \
+	echo "wheel: $$n profiles, $$labs labs, web UI: $$ui" && [ "$$n" -ge 40 ] && [ "$$labs" -ge 1 ] && [ "$$ui" = True ]
+
 clean:
-	rm -rf netsim/web web/node_modules .venv build *.egg-info
+	rm -rf netsim/web web/node_modules .venv build dist *.egg-info

@@ -55,6 +55,36 @@ def home_dir() -> Path:
     return Path(invoking_user().home) / ".config" / "netsim"
 
 
+def defaults_dir() -> Path | None:
+    """The shipped profile/lab library: inside the package, or the checkout itself."""
+    packaged = PACKAGE_DIR / "defaults"
+    if (packaged / "profiles").is_dir():
+        return packaged
+    checkout = PACKAGE_DIR.parent
+    return checkout if (checkout / "profiles").is_dir() else None
+
+
+def seed_home(home: Path) -> list[str]:
+    """Copy the shipped profiles and labs into a new home. Never overwrites: a
+    directory that already exists is left alone, so deleted examples stay deleted."""
+    src = defaults_dir()
+    if src is None or src.resolve() == home.resolve():
+        return []
+    copied = []
+    for kind in ("profiles", "labs"):
+        target = home / kind
+        if target.exists() or not (src / kind).is_dir():
+            continue
+        target.mkdir(parents=True)
+        for parent in (home, target):
+            chown_to_user(parent)
+        for f in sorted((src / kind).glob("*.yaml")):
+            (target / f.name).write_bytes(f.read_bytes())
+            chown_to_user(target / f.name)
+            copied.append(f"{kind}/{f.name}")
+    return copied
+
+
 def web_dir() -> Path | None:
     d = PACKAGE_DIR / "web"
     return d if (d / "index.html").exists() else None

@@ -25,7 +25,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from netsim import __version__
 from netsim.bus import Bus
-from netsim.config import RUN_DIR, chown_to_user, home_dir, web_dir
+from netsim.config import RUN_DIR, chown_to_user, home_dir, seed_home, web_dir
 from netsim.engine import DIRECTIONS, Engine, EngineError
 from netsim.models import Lab, Link, Profile
 from netsim.shaping import LinkShape, ShapingError, flatten_profile, netem
@@ -490,6 +490,8 @@ def build(run_dir: Path = RUN_DIR, home: Path | None = None, user_path: str | No
           check_host: bool = True) -> tuple[FastAPI, str]:
     """Create the app. The caller must hold acquire_instance_lock(run_dir)."""
     home = home or home_dir()
+    if copied := seed_home(home):
+        log.info("copied %d example profiles/labs to %s", len(copied), home)
     bus = Bus()
     engine = Engine(ProfileStore(home / "profiles"), LabStore(home / "labs"), bus, run_dir, user_path=user_path)
     token = write_token(run_dir)
