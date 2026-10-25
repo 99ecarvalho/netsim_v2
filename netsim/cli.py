@@ -320,23 +320,30 @@ def cmd_cut(args, blackhole: bool) -> None:
 
 
 def cmd_exec(args) -> None:
-    ns = f"netsim-{args.lab}-{args.node}"
-    external = False
-    try:
-        rt = Api().get(f"/api/labs/{args.lab}/runtime")
-        node = rt["plan"]["nodes"].get(args.node)
-        if not node:
-            raise CliError(f"lab {args.lab} has no node {args.node}")
-        if node["kind"] == "switch":
-            raise CliError("cannot run programs on a switch")
-        external = node["kind"] == "external"
-    except CliError as e:
-        if "not running" in str(e) or not Path(f"/run/netns/{ns}").exists():
-            raise
+    from netsim.topology import ns_name
+
+    ns = args.ns or ns_name(args.lab, args.node)
+    kind = None
+    if not args.ns:  # ask the daemon for the node's real namespace (containers use another one)
+        try:
+            rt = Api().get(f"/api/labs/{args.lab}/runtime")
+            node = rt["plan"]["nodes"].get(args.node)
+            if not node:
+                raise CliError(f"lab {args.lab} has no node {args.node}")
+            kind = node["kind"]
+            if kind == "switch":
+                raise CliError("cannot run programs on a switch")
+            ns = node["ns"] or ns
+        except CliError as e:
+            if "not running" in str(e) or not Path(f"/run/netns/{ns}").exists():
+                raise
     cmd = args.cmd or [os.environ.get("SHELL", "/bin/bash")]
-    if external:
+    if kind == "external":
         os.execvp(cmd[0], cmd)
-    elevate(["exec", args.lab, args.node, *(["--root"] if args.root else []), "--", *args.cmd],
+    if kind == "container":
+        print("netsim: entering the container's network only; files and processes are this machine's "
+              "(use `docker exec` to run inside the container)", file=sys.stderr)
+    elevate(["exec", "--ns", ns, *(["--root"] if args.root else []), args.lab, args.node, "--", *cmd],
             preserve_env=True)
     uid = int(os.environ.get("SUDO_UID", 0))
     gid = int(os.environ.get("SUDO_GID", 0))
@@ -521,25 +528,71 @@ def cmd_run(args) -> None:
 
 
 def cmd_validate(args) -> None:
-    from netsim.models import Lab, Profile
-    from netsim.store import StoreError, parse_yaml
+    """Check a file the way `up`/the daemon would: model, topology, profiles and netem commands."""
+    from netsim.bus import Bus
+    from netsim.engine import Engine, EngineError
+    from netsim.models import Lab, Link, Profile
+    from netsim.shaping import LinkShape, ShapingError, flatten_profile, netem
+    from netsim.store import LabStore, ProfileStore, StoreError, parse_yaml
+    from netsim.topology import PlanError, compile_lab
+    from netsim.units import UnitError
+
     path = Path(args.file)
     text = path.read_text()
     kind = args.kind or ("lab" if "nodes:" in text else "profile")
+    home = home_dir()
+    profiles = ProfileStore(home / "profiles")
     try:
         obj = parse_yaml(text, Lab if kind == "lab" else Profile, path.stem)
-    except StoreError as e:
+        if kind == "lab":
+            engine = Engine(profiles, LabStore(home / "labs"), Bus(), RUN_DIR)
+            shapes = engine.link_shapes(obj)
+            plan = compile_lab(obj, path.stem, obj.subnet or "10.201.0.0/16")
+            for n in plan.nodes.values():
+                print(f"{n.name:16} {n.kind:9} {', '.join(str(i.ip) for i in n.ifaces if i.ip)}")
+            for link_id, shape in shapes.items():
+                print(f"{link_id:24} up: {netem(shape.effective('up')).summary}  |  "
+                      f"down: {netem(shape.effective('down')).summary}")
+        else:
+            flat = flatten_profile(path.stem, lambda n: obj if n == path.stem else profiles.get(n))
+            shape = LinkShape(flat, Link(a="a", b="b"))
+            for step in (flat.timeline.steps if flat.timeline else [None]):
+                for d in ("up", "down"):
+                    netem(shape.effective(d, step))
+            for d in ("up", "down"):
+                print(f"{d:5} {netem(shape.effective(d)).summary}")
+    except KeyError as e:
+        raise CliError(f"{path}: unknown profile {e}") from None
+    except (StoreError, EngineError, PlanError, ShapingError, UnitError) as e:
         raise CliError(f"{path}: {e}") from None
-    if kind == "lab":
-        from netsim.topology import compile_lab
-        plan = compile_lab(obj, path.stem, obj.subnet or "10.201.0.0/16")
-        for n in plan.nodes.values():
-            print(f"{n.name:16} {n.kind:9} {', '.join(str(i.ip) for i in n.ifaces if i.ip)}")
     print(f"{path}: ok ({kind})")
 
 
 def cmd_cleanup(args) -> None:
-    removed = Api().post("/api/cleanup")["removed"]
+    if not args.local:
+        try:
+            removed = Api().post("/api/cleanup")["removed"]
+            print("\n".join(removed) if removed else "nothing to clean")
+            return
+        except CliError as e:
+            if "not running" not in str(e) and "cannot reach" not in str(e):
+                raise
+        print("netsim: daemon is not running, cleaning up directly", file=sys.stderr)
+    elevate(["cleanup", "--local"])
+    import asyncio
+
+    from netsim.bus import Bus
+    from netsim.config import InstanceRunning, acquire_instance_lock
+    from netsim.engine import Engine
+    from netsim.store import LabStore, ProfileStore
+
+    try:
+        lock = acquire_instance_lock(RUN_DIR)  # noqa: F841 - never clean behind a live daemon
+    except InstanceRunning as e:
+        raise CliError(f"{e} but does not answer; stop it before cleaning up") from None
+    home = home_dir()
+    engine = Engine(ProfileStore(home / "profiles"), LabStore(home / "labs"), Bus(), RUN_DIR)
+    removed = asyncio.run(engine.cleanup_stale())
     print("\n".join(removed) if removed else "nothing to clean")
 
 
@@ -615,7 +668,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("lab")
     sp.add_argument("node")
     sp.add_argument("--root", action="store_true", help="run as root instead of your user")
-    sp.add_argument("cmd", nargs=argparse.REMAINDER)
+    sp.add_argument("--ns", help=argparse.SUPPRESS)
+    sp.add_argument("cmd", nargs="*", help="command after --, e.g. netsim exec LAB NODE -- ping host")
 
     sp = add("pipe", cmd_pipe, "relay a local port through a shaped link: netsim pipe 6000:5000 -p 3g-hspa")
     sp.add_argument("spec", help="LISTEN:TARGET_PORT | LISTEN:HOST:PORT | ADDR:PORT:HOST:PORT")
@@ -633,7 +687,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--name", help="lab name (default run-<pid>)")
     sp.add_argument("-q", "--quiet", action="store_true")
     shaping_args(sp)
-    sp.add_argument("cmd", nargs=argparse.REMAINDER)
+    sp.add_argument("cmd", nargs="*", help="command after --")
 
     sp = add("logs", cmd_logs, "print a lab program's output")
     sp.add_argument("lab")
@@ -644,19 +698,27 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("file")
     sp.add_argument("--kind", choices=["lab", "profile"])
 
-    add("cleanup", cmd_cleanup, "remove leftovers of crashed runs")
+    sp = add("cleanup", cmd_cleanup, "remove leftovers of crashed runs (works without the daemon)")
+    sp.add_argument("--local", action="store_true", help=argparse.SUPPRESS)
     return p
 
 
 def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
-    raw = sys.argv[1:] if argv is None else argv
+    raw = list(sys.argv[1:] if argv is None else argv)
+    # everything after the first `--` is the user's command, never netsim options
+    tail = None
+    if "--" in raw:
+        i = raw.index("--")
+        raw, tail = raw[:i], raw[i + 1:]
     args = parser.parse_args(raw)
     if not getattr(args, "fn", None):
         parser.print_help()
         return
-    if args.command in ("exec", "run") and args.cmd[:1] == ["--"]:
-        args.cmd = args.cmd[1:]
+    if tail is not None:
+        if not hasattr(args, "cmd"):
+            parser.error(f"`{args.command}` does not take a command after --")
+        args.cmd = [*args.cmd, *tail]
     try:
         args.fn(args)
     except CliError as e:
