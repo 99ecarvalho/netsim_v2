@@ -586,6 +586,28 @@ _TOOLS = [
 ]
 
 
+def _netem_status() -> tuple[bool, str]:
+    """Is sch_netem usable? Works without modinfo or any other tool."""
+    if Path("/sys/module/sch_netem").exists():
+        return True, "loaded"
+    import platform
+    mods = Path("/lib/modules") / platform.release()
+    try:
+        if "sch_netem" in (mods / "modules.builtin").read_text():
+            return True, "built into the kernel"
+    except OSError:
+        pass
+    if mods.is_dir() and next(mods.rglob("sch_netem.ko*"), None):
+        return True, "available (loaded on first use)"
+    if shutil.which("modinfo"):
+        try:
+            if subprocess.run(["modinfo", "sch_netem"], capture_output=True).returncode == 0:
+                return True, "available (modinfo)"
+        except OSError:
+            pass
+    return False, "not found"
+
+
 def cmd_doctor(args) -> None:
     """Check what netsim needs before it creates anything."""
     import platform
@@ -605,9 +627,8 @@ def cmd_doctor(args) -> None:
     check(platform.system() == "Linux", "Linux", platform.release(), "netsim needs Linux network namespaces")
     check(sys.version_info >= (3, 12), "Python >= 3.12", platform.python_version())
     check(Path("/proc/self/ns/net").exists(), "network namespaces", "available", "kernel built without CONFIG_NET_NS")
-    netem = Path("/sys/module/sch_netem").exists() or subprocess.run(
-        ["modinfo", "sch_netem"], capture_output=True).returncode == 0
-    check(netem, "netem kernel module", "present",
+    netem, how = _netem_status()
+    check(netem, "netem kernel module", how,
           "sch_netem not found: install your kernel's extra modules (e.g. linux-modules-extra-$(uname -r))")
     for tool, required, purpose, pkg in _TOOLS:
         path = shutil.which(tool) or (shutil.which("podman") if tool == "docker" else None)

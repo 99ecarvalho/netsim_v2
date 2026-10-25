@@ -21,3 +21,11 @@ def test_exec_root_before_and_after_positionals():
     assert b.root and b.cmd == ["ls", "--all"]
     c = parse(["exec", "lab", "node"])
     assert not c.root and c.cmd == []
+
+
+def test_doctor_netem_check_without_tools(monkeypatch, tmp_path):
+    monkeypatch.setattr(cli.shutil, "which", lambda name: None)  # no modinfo, nothing on PATH
+    real_exists = cli.Path.exists
+    monkeypatch.setattr(cli.Path, "exists", lambda self: False if str(self) == "/sys/module/sch_netem" else real_exists(self))
+    ok, how = cli._netem_status()  # must not raise FileNotFoundError
+    assert isinstance(ok, bool) and how
