@@ -11,6 +11,7 @@ import HomeView from "./views/Home";
 import LabView from "./views/LabView";
 import ProfileView from "./views/ProfileView";
 import HelpView from "./views/Help";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 function TabIcon({ tab }: { tab: Tab }) {
   const labs = useStore((s) => s.labs);
@@ -126,10 +127,12 @@ export default function App() {
         <main className="main">
           {tabs.map((t) => (
             <div key={t.id} style={{ display: t.id === current.id ? "flex" : "none", flex: 1, minHeight: 0, flexDirection: "column" }}>
-              {t.kind === "home" && <HomeView />}
-              {t.kind === "help" && <HelpView />}
-              {t.kind === "lab" && <LabView name={t.name!} tabId={t.id} visible={t.id === current.id} />}
-              {t.kind === "profile" && <ProfileView name={t.name!} tabId={t.id} />}
+              <ErrorBoundary what="tab">
+                {t.kind === "home" && <HomeView />}
+                {t.kind === "help" && <HelpView />}
+                {t.kind === "lab" && <LabView name={t.name!} tabId={t.id} visible={t.id === current.id} />}
+                {t.kind === "profile" && <ProfileView name={t.name!} tabId={t.id} />}
+              </ErrorBoundary>
             </div>
           ))}
         </main>

@@ -30,7 +30,7 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, retried = false): Promise<T> {
   const headers: Record<string, string> = {};
   const t = token();
   if (t) headers.Authorization = `Bearer ${t}`;
@@ -41,6 +41,11 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     body: body === undefined ? undefined : JSON.stringify(body),
     credentials: "same-origin",
   });
+  if (res.status === 401 && t && !retried) {
+    // a token kept from an earlier daemon run: forget it and fall back to the cookie
+    localStorage.removeItem(TOKEN_KEY);
+    return request<T>(method, path, body, true);
+  }
   const text = await res.text();
   const data = text ? JSON.parse(text) : null;
   if (!res.ok) {

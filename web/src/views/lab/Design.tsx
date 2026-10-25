@@ -11,6 +11,7 @@ import { useStore } from "../../lib/store";
 import type { NodeKind, Plan } from "../../lib/types";
 import type { Validation } from "../LabView";
 import Inspector from "./Inspector";
+import ErrorBoundary from "../../components/ErrorBoundary";
 
 interface Props {
   name: string;
@@ -97,6 +98,7 @@ export default function Design({ name, text, parsed, plan, validation, diagnosti
       {parsed.error ? (
         <div className="empty">Fix the YAML to see the graph.</div>
       ) : (
+        <ErrorBoundary what="graph" resetKey={text}>
         <Topology
           data={data}
           plan={plan}
@@ -120,6 +122,7 @@ export default function Design({ name, text, parsed, plan, validation, diagnosti
             setSelection(null);
           })}
         />
+        </ErrorBoundary>
       )}
       {selection && !parsed.error && (
         <Inspector

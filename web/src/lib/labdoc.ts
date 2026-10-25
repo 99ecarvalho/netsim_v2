@@ -23,7 +23,48 @@ export function parseLab(text: string): ParsedLab {
   if (typeof data !== "object" || Array.isArray(data)) {
     return { doc, data: {}, error: { msg: "top level must be a mapping" } };
   }
+  const shape = checkShape(data as Record<string, unknown>);
+  if (shape) {
+    const line = lineOf(doc, text, shape.loc);
+    return { doc, data: {}, error: { msg: `${shape.loc}: ${shape.msg}`, line } };
+  }
   return { doc, data, error: null };
+}
+
+const isPlainMap = (v: unknown) => typeof v === "object" && v !== null && !Array.isArray(v);
+
+/** The minimum structure the graph needs; the server validates everything else. */
+function checkShape(d: Record<string, unknown>): { loc: string; msg: string } | null {
+  if (d.nodes != null) {
+    if (!isPlainMap(d.nodes)) return { loc: "nodes", msg: "must be a mapping of node names" };
+    for (const [k, v] of Object.entries(d.nodes as object)) {
+      if (v != null && !isPlainMap(v)) return { loc: `nodes.${k}`, msg: "must be a mapping (or empty)" };
+    }
+  }
+  if (d.links != null) {
+    if (!Array.isArray(d.links)) return { loc: "links", msg: "must be a list" };
+    for (const [i, l] of (d.links as unknown[]).entries()) {
+      if (!isPlainMap(l)) return { loc: `links.${i}`, msg: "must be a mapping like {a: x, b: y}" };
+      const link = l as Record<string, unknown>;
+      if (typeof link.a !== "string" || typeof link.b !== "string") return { loc: `links.${i}`, msg: "needs a and b" };
+    }
+  }
+  for (const key of ["programs", "proxies"]) {
+    const v = d[key];
+    if (v == null) continue;
+    if (!Array.isArray(v)) return { loc: key, msg: "must be a list" };
+    for (const [i, item] of v.entries()) if (!isPlainMap(item)) return { loc: `${key}.${i}`, msg: "must be a mapping" };
+  }
+  if (d.layout != null) {
+    if (!isPlainMap(d.layout)) return { loc: "layout", msg: "must be a mapping" };
+    for (const [k, p] of Object.entries(d.layout as object)) {
+      const pos = p as Record<string, unknown>;
+      if (!isPlainMap(p) || typeof pos.x !== "number" || typeof pos.y !== "number") {
+        return { loc: `layout.${k}`, msg: "must be {x: number, y: number}" };
+      }
+    }
+  }
+  return null;
 }
 
 export function serialize(doc: Document): string {

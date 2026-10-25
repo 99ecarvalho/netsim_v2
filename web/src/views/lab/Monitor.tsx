@@ -6,6 +6,7 @@ import { serialize, setIn } from "../../lib/labdoc";
 import { useEffect, useMemo, useState } from "react";
 import Chart, { type SeriesDef } from "../../components/Chart";
 import Topology, { type Selection } from "../../components/Topology";
+import ErrorBoundary from "../../components/ErrorBoundary";
 import { Split, useTick } from "../../components/ui";
 import { api, enc } from "../../lib/api";
 import { fmtBps, fmtBytes, fmtTime } from "../../lib/format";
@@ -49,7 +50,9 @@ export default function Monitor({ name, runtime, samples, events, editorDirty, o
       initial={0.58}
       left={
         <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
-          <Topology data={data} plan={runtime.plan} runtime={runtime} stats={latest} editable={false} selection={selection} onSelect={setSelection} />
+          <ErrorBoundary what="graph" resetKey={runtime.started_at}>
+            <Topology data={data} plan={runtime.plan} runtime={runtime} stats={latest} editable={false} selection={selection} onSelect={setSelection} />
+          </ErrorBoundary>
         </div>
       }
       right={
