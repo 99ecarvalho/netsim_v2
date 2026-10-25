@@ -7,7 +7,9 @@ Bug reports, profiles and fixes are welcome.
 ```sh
 ./run.sh build          # python venv + web UI
 make test               # unit tests, no root needed
+sudo .venv/bin/pytest -p no:cacheprovider tests/test_live_root.py   # builds real namespaces
 make dev                # UI with hot reload against a running daemon (./run.sh)
+make dist               # release artifacts, checked in a clean venv
 ```
 
 ## Before a pull request

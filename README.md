@@ -38,7 +38,14 @@ netsim serve --open   # starts the daemon (asks for sudo) and opens the UI
 ```
 
 Other targets: `make serve` (run from a local venv), `make service` (systemd unit, starts on boot),
-`make dev` (UI with hot reload), `make test`.
+`make dev` (UI with hot reload), `make test`, `make dist` (wheel + sdist with UI and the YAML
+library, tested in a clean venv).
+
+`netsim doctor` checks tools, kernel support and setup. Only one daemon runs per machine; a second
+`netsim serve` refuses and changes nothing.
+
+Installed copies (not a checkout) keep profiles and labs in `~/.config/netsim`, seeded with the
+examples on first start. Existing files are never overwritten.
 
 Profiles and labs are plain YAML under `profiles/` and `labs/` of this checkout (or `$NETSIM_HOME`,
 or `~/.config/netsim` for non-editable installs).
@@ -148,7 +155,8 @@ Shipped (`netsim profiles`): `ideal`; LAN `lan-gigabit`, `lan-100m`, `lan-conges
 
 ## Web UI
 
-`netsim serve` prints the URL (with a one-time token); `netsim ui` opens it later.
+`netsim serve` prints the URL with a login token when run in a terminal; `netsim ui` prints and
+opens it at any time. The token is never written to logs.
 
 - **Design**: graph editor and YAML editor side by side, editing the same file (comments survive).
   Drag from a node's edge dot to link, Del to remove, inspector for nodes/links, live validation with
@@ -180,12 +188,13 @@ Shipped (`netsim profiles`): `ideal`; LAN `lan-gigabit`, `lan-100m`, `lan-conges
 | `netsim up LAB` / `down LAB\|--all` / `restart LAB` / `status [LAB]` | lifecycle |
 | `netsim run -p PROFILE [-f PORT[:HOSTPORT]] [--delay ..] -- CMD` | one command through a shaped link |
 | `netsim pipe LISTEN:TARGET -p PROFILE [--udp]` | shape one client/server conversation |
-| `netsim exec LAB NODE [--root] [-- CMD]` | run inside a node (default: your shell) |
+| `netsim exec LAB NODE [--root] [-- CMD]` | run inside a node (default: your shell); everything after `--` is the command |
 | `netsim shape LAB LINK [-p PROFILE] [-d up\|down\|both] [--delay ..] [--reset]` | live link change |
 | `netsim cut LAB LINK` / `heal LAB LINK` | drop everything / restore |
 | `netsim logs LAB PROGRAM [-f]` | program output |
 | `netsim validate FILE` | check a YAML file without the daemon |
-| `netsim cleanup` | remove leftovers of a crashed daemon |
+| `netsim cleanup` | remove leftovers of a crashed daemon (works with the daemon stopped) |
+| `netsim doctor` | check tools, kernel support and setup |
 
 ## What netsim changes on the host
 

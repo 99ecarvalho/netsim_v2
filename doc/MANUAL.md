@@ -721,9 +721,16 @@ It also turns on `net.ipv4.ip_forward`, and leaves it on.
 
 ## 13. Troubleshooting
 
+**Something does not work and you don't know why.** Run `netsim doctor`. It checks the tools,
+the kernel support and the setup, and says what to install.
+
 **"netsim daemon is not running".** Run `./run.sh`.
 
+**"another netsim daemon is running".** Only one daemon runs per machine. Use the one that runs
+(`netsim ui`), or stop it first (`./run.sh stop`).
+
 **The page says "Not authorized".** The token changed when the daemon restarted. Use the new link
+from `netsim ui`, or
 from `./run.sh status`.
 
 **A lab does not start.** The error is shown in the UI and in the terminal. Common causes: a
@@ -736,7 +743,8 @@ needs internet access: connect it to an `external` node with `internet: true`.
 **`localhost` does not work inside a node.** That is expected: `localhost` is the node itself.
 Use `--forward`, or reach your machine through its external node by name (`host` in `netsim run`).
 
-**Things are left over after a crash.** `netsim cleanup` removes them. The daemon also does this
+**Things are left over after a crash.** `netsim cleanup` removes them, also with the daemon
+stopped. The daemon also does this
 when it starts.
 
 **I want to see exactly what netsim did.** Open the lab's **Commands** tab, or `./run.sh logs`.
@@ -758,12 +766,13 @@ when it starts.
 | `netsim status [LAB]` | what is running |
 | `netsim run -p PROFILE [-f PORT[:HOSTPORT]] [-q] -- CMD` | one command through a shaped link |
 | `netsim pipe LISTEN:TARGET -p PROFILE [--udp]` | shape one client/server conversation |
-| `netsim exec LAB NODE [--root] [-- CMD]` | run inside a node |
+| `netsim exec LAB NODE [--root] [-- CMD]` | run inside a node; everything after `--` is the command |
 | `netsim shape LAB LINK [-p P] [-d up\|down\|both] [--delay ..] [--loss ..] [--rate ..] [--reset]` | change a link now |
 | `netsim cut LAB LINK` / `heal LAB LINK` | drop all traffic / restore |
 | `netsim logs LAB PROGRAM [-f]` | program output |
 | `netsim validate FILE` | check a YAML file |
-| `netsim cleanup` | remove leftovers |
+| `netsim cleanup` | remove leftovers (works with the daemon stopped) |
+| `netsim doctor` | check tools, kernel support and setup |
 
 `run` and `pipe` also accept `--delay`, `--jitter`, `--loss`, `--rate`, `--queue` and others to
 override the profile.

@@ -11,4 +11,6 @@ First public release.
 - Daemon with token-protected HTTP/WebSocket API.
 - Web UI: graph + YAML editor, live monitor, packet capture, ping/iperf3 probes, terminals.
 - Live link changes; saved shaping changes apply to running labs without restart.
-- `run.sh` launcher, Makefile, systemd unit.
+- `run.sh` launcher, Makefile, systemd unit, `netsim doctor`.
+- One daemon per machine; the login token is never written to logs.
+- Wheel and sdist carry the web UI and the profile/lab library.
