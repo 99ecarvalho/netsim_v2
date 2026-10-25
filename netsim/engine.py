@@ -372,6 +372,19 @@ class Engine:
             shapes[link.id] = shape
         return shapes
 
+    @staticmethod
+    def _preflight(lab: Lab, plan: Plan) -> None:
+        """Fail before creating anything when a needed tool is missing."""
+        need = ["ip", "tc", "sysctl", "setpriv", "setsid"]
+        if plan.internet:
+            need.append("nft")
+        if any(n.kind == "container" for n in lab.nodes.values()) and not (
+                shutil.which("docker") or shutil.which("podman")):
+            raise EngineError("container nodes need docker or podman (see `netsim doctor`)")
+        missing = [t for t in need if not shutil.which(t)]
+        if missing:
+            raise EngineError(f"missing {', '.join(missing)} (see `netsim doctor`)")
+
     async def _check_conflicts(self, name: str, plan: Plan) -> None:
         """Refuse address or name clashes with running labs and, when the lab reaches the host, its routes."""
         tag = lab_tag(name)
@@ -420,6 +433,7 @@ class Engine:
                     shapes = self.link_shapes(lab)
                     base = await self.allocate_base(lab, name)
                     plan = compile_lab(lab, name, base)
+                    self._preflight(lab, plan)
                     await self._check_conflicts(name, plan)
                 except (PlanError, EngineError) as e:
                     self.failures[name] = str(e)

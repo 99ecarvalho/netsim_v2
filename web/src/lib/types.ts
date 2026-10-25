@@ -184,6 +184,7 @@ export interface CaptureInfo {
   started: number;
   packets: number;
   running: boolean;
+  truncated?: boolean;
   size: number;
 }
 

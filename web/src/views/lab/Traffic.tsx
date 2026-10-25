@@ -140,7 +140,9 @@ function PacketTable({ cap, onDelete }: { cap: CaptureInfo; onDelete: () => void
             </button>
           </>
         ) : (
-          <span className="badge">stopped</span>
+          <span className={`badge ${cap.truncated ? "warn" : ""}`} title={cap.truncated ? "Captures stop at 200 MiB" : ""}>
+            {cap.truncated ? "stopped: size limit" : "stopped"}
+          </span>
         )}
         <a className="btn small" href={`/api/captures/${cap.id}/pcap`} download>
           <Download size={12} /> .pcap

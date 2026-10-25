@@ -568,6 +568,68 @@ def cmd_validate(args) -> None:
     print(f"{path}: ok ({kind})")
 
 
+_TOOLS = [
+    # (binary, required, what it is for, debian/ubuntu package)
+    ("ip", True, "namespaces, links, routes", "iproute2"),
+    ("tc", True, "link shaping (netem)", "iproute2"),
+    ("sysctl", True, "forwarding inside nodes", "procps"),
+    ("setpriv", True, "run programs as you inside nodes", "util-linux"),
+    ("setsid", True, "program and terminal sessions", "util-linux"),
+    ("sudo", True, "the daemon needs root", "sudo"),
+    ("nft", False, "internet access and host firewall for external nodes", "nftables"),
+    ("iptables", False, "hosts with Docker (FORWARD policy DROP)", "iptables"),
+    ("tcpdump", False, "packet summaries in captures", "tcpdump"),
+    ("ping", False, "ping probes", "iputils-ping"),
+    ("iperf3", False, "throughput probes", "iperf3"),
+    ("ss", False, "TCP details per node", "iproute2"),
+    ("docker", False, "container nodes (or podman)", "docker.io"),
+]
+
+
+def cmd_doctor(args) -> None:
+    """Check what netsim needs before it creates anything."""
+    import platform
+
+    from netsim.config import web_dir
+
+    problems = 0
+    rows = []
+
+    def check(ok: bool | None, what: str, detail: str = "", hint: str = "", required: bool = True):
+        nonlocal problems
+        mark = "ok" if ok else ("FAIL" if required else "--")
+        if not ok and required:
+            problems += 1
+        rows.append((mark, what, detail if ok else hint or detail))
+
+    check(platform.system() == "Linux", "Linux", platform.release(), "netsim needs Linux network namespaces")
+    check(sys.version_info >= (3, 12), "Python >= 3.12", platform.python_version())
+    check(Path("/proc/self/ns/net").exists(), "network namespaces", "available", "kernel built without CONFIG_NET_NS")
+    netem = Path("/sys/module/sch_netem").exists() or subprocess.run(
+        ["modinfo", "sch_netem"], capture_output=True).returncode == 0
+    check(netem, "netem kernel module", "present",
+          "sch_netem not found: install your kernel's extra modules (e.g. linux-modules-extra-$(uname -r))")
+    for tool, required, purpose, pkg in _TOOLS:
+        path = shutil.which(tool) or (shutil.which("podman") if tool == "docker" else None)
+        check(bool(path), tool, f"{path}  ({purpose})", f"missing: {purpose} - install package `{pkg}`", required)
+    check(web_dir() is not None, "web UI built", str(web_dir()), "run `make web` (or ./run.sh build)", required=False)
+    home = home_dir()
+    n_profiles = len(list((home / "profiles").glob("*.yaml"))) if (home / "profiles").is_dir() else 0
+    check(n_profiles > 0, "profile library", f"{n_profiles} profiles in {home / 'profiles'}",
+          f"no profiles in {home / 'profiles'} (installed copies are seeded on first `netsim serve`)", required=False)
+    try:
+        info = Api().get("/api/info")
+        check(True, "daemon", f"running, programs run as {info['user']}")
+    except CliError as e:
+        check(False, "daemon", "", f"{e}", required=False)
+
+    width = max(len(r[1]) for r in rows)
+    for mark, what, detail in rows:
+        print(f"{mark:>4}  {what:<{width}}  {detail}")
+    if problems:
+        raise CliError(f"{problems} required item(s) missing")
+
+
 def cmd_cleanup(args) -> None:
     if not args.local:
         try:
@@ -697,6 +759,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("validate", cmd_validate, "check a lab or profile YAML file (offline)")
     sp.add_argument("file")
     sp.add_argument("--kind", choices=["lab", "profile"])
+
+    add("doctor", cmd_doctor, "check tools, kernel support and setup")
 
     sp = add("cleanup", cmd_cleanup, "remove leftovers of crashed runs (works without the daemon)")
     sp.add_argument("--local", action="store_true", help=argparse.SUPPRESS)
