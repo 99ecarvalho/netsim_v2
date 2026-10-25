@@ -35,7 +35,8 @@ jobs:
         working-directory: web
       - run: npm run build
         working-directory: web
-      - run: npm audit --omit=dev
+      # whole tree: the build toolchain (vite, esbuild) runs on developer machines too
+      - run: npm audit
         working-directory: web
 
   package:
