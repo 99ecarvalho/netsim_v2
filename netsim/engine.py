@@ -44,6 +44,8 @@ log = logging.getLogger("netsim.engine")
 
 STATS_INTERVAL = 1.0
 STATS_HISTORY = 600
+KEEP_CAPTURES = 10  # per lab; older stopped captures and their files are deleted
+KEEP_PROBES = 20  # per lab
 LOG_LINES = 5000
 EVENTS = 1000
 NETNS_ETC = Path("/etc/netns")
@@ -141,6 +143,7 @@ class Capture:
         return {"id": self.id, "lab": self.lab, "link": self.link, "side": self.side, "node": self.node,
                 "iface": self.iface, "filter": self.filter, "started": self.started, "packets": self.packets,
                 "running": bool(self.proc and self.proc.running),
+                "truncated": bool(self.proc and self.proc.truncated),
                 "size": self.path.stat().st_size if self.path.exists() else 0}
 
 
@@ -220,7 +223,9 @@ class Engine:
 
     async def start(self, cleanup: bool = True) -> None:
         self.run_dir.mkdir(parents=True, exist_ok=True)
-        (self.run_dir / "captures").mkdir(exist_ok=True)
+        captures = self.run_dir / "captures"
+        shutil.rmtree(captures, ignore_errors=True)  # files of a previous run are unreachable anyway
+        captures.mkdir(mode=0o700)
         system.TC_ENV["TC_LIB_DIR"] = str(install_distributions(self.run_dir / "tc"))
         system.init_root_ns_fd()
         if cleanup:  # off for tests, which must not touch a daemon running on the same host
@@ -235,6 +240,8 @@ class Engine:
                 await self.down(name)
             except Exception as e:  # noqa: BLE001 - best effort on shutdown
                 log.warning("teardown of %s failed: %s", name, e)
+        for cid in list(self.captures):
+            self.capture_delete(cid)
 
     async def cleanup_stale(self) -> list[str]:
         """Remove leftovers from a previous daemon (namespaces, host ifaces, nft tables, iptables rules)."""
@@ -582,6 +589,7 @@ class Engine:
             await self.capture_stop(cap.id)
         for probe in [p for p in self.probes.values() if p.lab == rt.name]:
             await self.probe_stop(probe.id)
+            self.probes.pop(probe.id, None)  # results belong to this run of the lab
         existing = await list_netns()
         for ns in rt.attached:
             if ns in existing:
@@ -1038,7 +1046,12 @@ class Engine:
             else:
                 cap.dropped += 1
 
-        cap.proc = PacketCapture(rt.iface_ns(end.node), end.name, path, bpf, on_line)
+        def on_limit():
+            self.event(rt, "warn", f"capture {cid} reached {cap.proc.max_bytes // 2**20} MiB and stopped; "
+                                   "download it and start a new one")
+            asyncio.get_running_loop().create_task(self.capture_stop(cid))
+
+        cap.proc = PacketCapture(rt.iface_ns(end.node), end.name, path, bpf, on_line, on_limit)
         try:
             await cap.proc.start()
         except (OSError, ValueError) as e:
@@ -1057,6 +1070,14 @@ class Engine:
                 pass
         cap.flusher = asyncio.create_task(flush())
         self.captures[cid] = cap
+        mine = sorted((c for c in self.captures.values() if c.lab == name), key=lambda c: c.started)
+        excess = len(mine) - KEEP_CAPTURES
+        for old in mine:  # drop the oldest finished captures beyond the limit
+            if excess <= 0:
+                break
+            if not (old.proc and old.proc.running):
+                self.capture_delete(old.id)
+                excess -= 1
         self.event(rt, "info", f"capture {cid} on {link_id} ({end.node}/{end.name})")
         self._changed(rt)
         return cap
@@ -1136,6 +1157,10 @@ class Engine:
             self._changed(rt)
         probe.task = asyncio.create_task(watch())
         self.probes[pid] = probe
+        mine = sorted((p for p in self.probes.values() if p.lab == name), key=lambda p: p.started)
+        for old in mine[:-KEEP_PROBES]:
+            if not old.running:
+                self.probes.pop(old.id, None)
         self._changed(rt)
         return probe
 

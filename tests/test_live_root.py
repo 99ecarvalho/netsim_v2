@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-or-later
 # Copyright (C) 2026 Eduardo Correia
-"""Integration tests that build real namespaces. Run with: sudo .venv/bin/pytest tests/test_live_root.py"""
+"""Integration tests that build real namespaces. Run with: sudo .venv/bin/pytest -p no:cacheprovider tests/test_live_root.py"""
 
 import asyncio
 import os
@@ -82,3 +82,14 @@ async def test_restart_keeps_temporary_lab(engine):
     assert "t-temp" in engine.running and engine.labs.is_ephemeral("t-temp")
     await engine.down("t-temp")
     assert not engine.labs.exists("t-temp")
+
+
+async def test_capture_stops_at_size_limit(engine, monkeypatch):
+    from netsim import capture
+    rt = await engine.up("t-live")
+    cap = await engine.capture_start("t-live", "c--s")
+    cap.proc.max_bytes = 2000
+    await rt.runner.nsexec(rt.iface_ns("c"), "ping", "-c", "20", "-i", "0.01", "-s", "500", rt.plan.node_ip("s"))
+    await asyncio.sleep(0.3)
+    assert cap.proc.truncated and not cap.proc.running
+    assert cap.path.stat().st_size <= 2000 + len(capture.PCAP_HEADER)

@@ -26,12 +26,17 @@ SNAPLEN = 262144
 # so captures on routers show direction correctly (Wireshark shows it too)
 PCAP_HEADER = struct.pack("<IHHiIII", 0xA1B2C3D4, 2, 4, 0, 0, SNAPLEN, 113)
 ARPHRD_ETHER = 1
+MAX_BYTES = 200 * 1024 * 1024  # captures live in /run (memory): stop instead of filling it
 
 
 class PacketCapture:
     def __init__(self, ns: str | None, iface: str, path: Path, display_filter: str,
-                 on_line: Callable[[str], None]):
+                 on_line: Callable[[str], None], on_limit: Callable[[], None] | None = None,
+                 max_bytes: int = MAX_BYTES):
         self.ns, self.iface, self.path = ns, iface, path
+        self.on_limit = on_limit or (lambda: None)
+        self.max_bytes = max_bytes
+        self.truncated = False
         self.display_filter = display_filter
         self.on_line = on_line
         self.count = 0
@@ -75,8 +80,13 @@ class PacketCapture:
             # SLL header: packet type, ARPHRD, address length, source MAC (8 bytes), ethertype
             data = struct.pack(">HHH8s", addr[2], ARPHRD_ETHER, 6, frame[6:12]) + frame[12:14] + frame[14:]
             rec = struct.pack("<IIII", ts // 1_000_000_000, ts % 1_000_000_000 // 1000, len(data), len(data)) + data
+            if self.bytes + len(rec) > self.max_bytes:
+                self.truncated = True
+                self._detach()
+                self.on_limit()
+                return
             self.count += 1
-            self.bytes += len(data)
+            self.bytes += len(rec)
             self._file.write(rec)
             if self._dissector and self._dissector.returncode is None:
                 try:
