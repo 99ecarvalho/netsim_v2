@@ -1,0 +1,10 @@
+title: LTE with handovers
+description: Moving vehicle on LTE. Every ~30 s a handover interrupts traffic briefly and spikes latency.
+category: dynamic
+extends: 4g-lte
+timeline:
+  loop: true
+  steps:
+    - {duration: 30s, label: attached}
+    - {duration: 150ms, label: handover, blackhole: true}
+    - {duration: 2s, label: after handover, delay: 80ms, jitter: 40ms, loss: 2%}

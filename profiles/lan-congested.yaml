@@ -1,0 +1,9 @@
+title: LAN (congested office)
+description: Busy shared office network. Occasional queueing spikes and rare drops.
+category: lan
+delay: 2ms
+jitter: 3ms
+distribution: pareto
+rate: 100mbit
+queue: 200ms
+loss: 0.1%

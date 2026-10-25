@@ -1,0 +1,12 @@
+title: Wi-Fi 5 GHz (near AP)
+description: >
+  802.11ac/ax close to the access point. Frame aggregation makes delivery
+  slightly bursty (modelled with netem slots).
+category: wifi
+delay: 2ms
+jitter: 2ms
+distribution: normal
+loss: 0.05%
+slot: {min: 0.5ms, max: 2ms}
+up: {rate: 150mbit}
+down: {rate: 300mbit}

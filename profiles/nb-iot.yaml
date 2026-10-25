@@ -1,0 +1,13 @@
+title: NB-IoT
+description: >
+  Narrowband IoT. Tens of kbit/s and multi-second latency; anything chatty or
+  with short timeouts breaks here.
+category: iot
+tags: [nb-iot, iot, cellular]
+delay: 1s
+jitter: 500ms
+distribution: lognormal
+loss: 1%
+queue: 5s
+up: {rate: 60kbit}
+down: {rate: 25kbit}

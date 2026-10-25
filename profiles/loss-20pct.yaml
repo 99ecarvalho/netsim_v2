@@ -1,0 +1,5 @@
+title: 20% random loss
+description: Extreme loss. TCP will stall; good to test application timeouts and retries.
+category: impairment
+delay: 10ms
+loss: 20%

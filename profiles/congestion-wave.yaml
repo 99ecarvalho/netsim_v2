@@ -1,0 +1,15 @@
+title: Congestion wave
+description: Available bandwidth falls and recovers in 10 s steps. Good for adaptive bitrate and backpressure tests.
+category: dynamic
+delay: 20ms
+jitter: 5ms
+queue: 500ms
+timeline:
+  loop: true
+  steps:
+    - {duration: 10s, label: 10M, rate: 10mbit}
+    - {duration: 10s, label: 5M, rate: 5mbit}
+    - {duration: 10s, label: 1M, rate: 1mbit}
+    - {duration: 10s, label: 256k, rate: 256kbit}
+    - {duration: 10s, label: 1M, rate: 1mbit}
+    - {duration: 10s, label: 5M, rate: 5mbit}

@@ -1,0 +1,13 @@
+title: LTE-M (Cat-M1)
+description: >
+  Cellular IoT (LTE-M). Hundreds of kbit/s and 150-300 ms RTT. Common for
+  telemetry gateways, meters, elevators and vending machines.
+category: iot
+tags: [lte-m, cat-m1, iot, cellular]
+delay: 80ms
+jitter: 40ms
+distribution: lognormal
+loss: 0.5%
+queue: 2s
+up: {rate: 375kbit}
+down: {rate: 300kbit}

@@ -1,0 +1,13 @@
+title: 2G GPRS
+description: >
+  GSM data (GPRS). Very low bandwidth, RTT of 600 ms to over a second, deep
+  operator buffers. "up" is device -> network.
+category: mobile
+tags: [2g, gsm, cellular]
+delay: 300ms
+jitter: 100ms
+distribution: lognormal
+loss: 1%
+queue: 2s
+up: {rate: 20kbit}
+down: {rate: 50kbit}

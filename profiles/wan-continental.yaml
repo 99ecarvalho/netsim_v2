@@ -1,0 +1,8 @@
+title: WAN (same continent)
+description: Client and server ~2000 km apart over the internet. ~50 ms RTT.
+category: wan
+delay: 25ms
+jitter: 2ms
+distribution: normal
+rate: 100mbit
+loss: 0.02%

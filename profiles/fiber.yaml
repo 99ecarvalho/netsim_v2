@@ -1,0 +1,8 @@
+title: Fiber (FTTH)
+description: Fiber to the home.
+category: wan
+delay: 2ms
+jitter: 0.5ms
+distribution: normal
+up: {rate: 300mbit}
+down: {rate: 1gbit}

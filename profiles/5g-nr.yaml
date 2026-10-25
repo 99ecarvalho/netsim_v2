@@ -1,0 +1,11 @@
+title: 5G NR (sub-6 GHz)
+description: Mid-band 5G with good coverage.
+category: mobile
+tags: [5g, cellular]
+delay: 8ms
+jitter: 3ms
+distribution: lognormal
+loss: 0.05%
+queue: 150ms
+up: {rate: 50mbit}
+down: {rate: 300mbit}

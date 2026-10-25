@@ -1,0 +1,13 @@
+title: Flaky cellular
+description: >
+  3G that keeps dropping to EDGE and losing coverage: the realistic version of
+  "it works on my desk".
+category: dynamic
+extends: 3g-umts
+timeline:
+  loop: true
+  steps:
+    - {duration: 40s, label: 3g}
+    - {duration: 5s, label: no coverage, blackhole: true}
+    - {duration: 15s, label: fallback to edge, delay: 150ms, jitter: 50ms, up: {rate: 100kbit}, down: {rate: 200kbit}}
+    - {duration: 3s, label: no coverage, blackhole: true}

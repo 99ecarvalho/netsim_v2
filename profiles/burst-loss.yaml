@@ -1,0 +1,8 @@
+title: Bursty loss
+description: >
+  Gilbert-Elliott loss: a packet enters a "bad" state with 2% probability and
+  stays there for ~5 packets. Average loss ~9%, but in bursts - much harsher
+  on protocols than the same average random loss.
+category: impairment
+delay: 10ms
+burst_loss: {p: 2%, r: 20%}

@@ -1,0 +1,6 @@
+title: Reordering
+description: 10% of packets overtake the 20 ms queue, so they arrive out of order.
+category: impairment
+delay: 20ms
+reorder: 10%
+reorder_correlation: 25%

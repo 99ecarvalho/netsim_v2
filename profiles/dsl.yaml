@@ -1,0 +1,9 @@
+title: ADSL
+description: Home ADSL2+. Slow uplink with an oversized modem buffer (bufferbloat on upload).
+category: wan
+delay: 15ms
+jitter: 2ms
+distribution: normal
+loss: 0.05%
+up: {rate: 1mbit, queue: 1s}
+down: {rate: 16mbit, queue: 200ms}

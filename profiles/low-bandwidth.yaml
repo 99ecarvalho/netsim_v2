@@ -1,0 +1,6 @@
+title: Low bandwidth (64 kbit/s)
+description: Symmetric 64 kbit/s, e.g. a narrow radio link or an ISDN B channel.
+category: impairment
+delay: 20ms
+rate: 64kbit
+queue: 1s

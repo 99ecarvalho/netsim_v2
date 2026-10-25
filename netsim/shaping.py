@@ -118,8 +118,8 @@ def queue_packets(params: dict[str, Any], rate_bps: int | None) -> int | None:
         return int(q)
     ms = units.parse_duration(q)
     if not rate_bps:
-        raise ShapingError("a time-based 'queue' needs a 'rate'")
-    return max(2, math.ceil(rate_bps / 8 * ms / 1000 / MTU_PKT))
+        return None  # no bottleneck, nothing to queue behind
+    return max(8, math.ceil(rate_bps / 8 * ms / 1000 / MTU_PKT))
 
 
 def netem(params: dict[str, Any]) -> NetemSpec:

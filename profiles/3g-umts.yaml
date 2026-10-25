@@ -1,0 +1,11 @@
+title: 3G UMTS
+description: Basic 3G (R99). ~150 ms RTT.
+category: mobile
+tags: [3g, cellular]
+delay: 75ms
+jitter: 25ms
+distribution: lognormal
+loss: 0.3%
+queue: 1s
+up: {rate: 384kbit}
+down: {rate: 1.5mbit}

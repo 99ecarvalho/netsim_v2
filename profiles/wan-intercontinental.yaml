@@ -1,0 +1,8 @@
+title: WAN (intercontinental)
+description: E.g. South America <-> Europe. ~180 ms RTT.
+category: wan
+delay: 90ms
+jitter: 5ms
+distribution: normal
+rate: 50mbit
+loss: 0.1%

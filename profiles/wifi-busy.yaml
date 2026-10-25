@@ -1,0 +1,13 @@
+title: Wi-Fi 2.4 GHz (busy)
+description: >
+  Crowded 2.4 GHz channel (apartment block, conference). Heavy-tailed delay,
+  bursty loss from collisions and retries.
+category: wifi
+delay: 8ms
+jitter: 15ms
+distribution: pareto
+burst_loss: {p: 0.5%, r: 30%}
+slot: {min: 2ms, max: 8ms}
+queue: 300ms
+up: {rate: 20mbit}
+down: {rate: 30mbit}

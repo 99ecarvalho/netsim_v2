@@ -1,0 +1,4 @@
+title: Outage
+description: Link is cut - every packet is dropped.
+category: impairment
+blackhole: true

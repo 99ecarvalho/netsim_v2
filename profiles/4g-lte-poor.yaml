@@ -1,0 +1,13 @@
+title: 4G LTE (poor signal)
+description: >
+  Cell edge or indoors behind concrete. Low throughput, high variable delay,
+  bursty loss, bufferbloat in the operator network.
+category: mobile
+tags: [4g, lte, cellular]
+delay: 50ms
+jitter: 30ms
+distribution: lognormal
+burst_loss: {p: 0.5%, r: 25%}
+queue: 1s
+up: {rate: 1mbit}
+down: {rate: 5mbit}

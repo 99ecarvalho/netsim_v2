@@ -1,0 +1,11 @@
+title: 3G HSPA
+description: HSPA/HSPA+. ~90 ms RTT, a few Mbit/s.
+category: mobile
+tags: [3g, cellular]
+delay: 45ms
+jitter: 15ms
+distribution: lognormal
+loss: 0.2%
+queue: 500ms
+up: {rate: 2mbit}
+down: {rate: 7mbit}

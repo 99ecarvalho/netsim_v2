@@ -1,0 +1,9 @@
+title: Flapping link
+description: 10 s up, 3 s down, forever. Tests reconnect logic.
+category: dynamic
+delay: 10ms
+timeline:
+  loop: true
+  steps:
+    - {duration: 10s, label: up}
+    - {duration: 3s, label: down, blackhole: true}

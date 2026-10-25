@@ -1,0 +1,7 @@
+title: LAN 1 Gbit/s
+description: Switched gigabit Ethernet. Sub-millisecond latency, no loss.
+category: lan
+delay: 0.1ms
+jitter: 0.02ms
+distribution: normal
+rate: 1gbit

@@ -1,0 +1,11 @@
+title: 4G LTE (good signal)
+description: Urban LTE with good signal. ~45 ms RTT, asymmetric bandwidth.
+category: mobile
+tags: [4g, lte, cellular]
+delay: 22ms
+jitter: 8ms
+distribution: lognormal
+loss: 0.1%
+queue: 300ms
+up: {rate: 15mbit}
+down: {rate: 50mbit}

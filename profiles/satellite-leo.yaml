@@ -1,0 +1,18 @@
+title: Satellite LEO (Starlink-like)
+description: >
+  Low-earth-orbit constellation. Good bandwidth and ~40 ms RTT, but the
+  satellite schedule is reconfigured every 15 s causing short latency and loss
+  spikes.
+category: satellite
+delay: 20ms
+jitter: 8ms
+distribution: lognormal
+loss: 0.3%
+queue: 200ms
+up: {rate: 10mbit}
+down: {rate: 100mbit}
+timeline:
+  loop: true
+  steps:
+    - {duration: 14.7s, label: stable}
+    - {duration: 300ms, label: reconfiguration, delay: 60ms, jitter: 30ms, loss: 5%}

@@ -1,0 +1,5 @@
+title: Corruption
+description: 1% of packets get a random bit flipped (checksums usually catch it, which shows up as loss).
+category: impairment
+delay: 5ms
+corrupt: 1%

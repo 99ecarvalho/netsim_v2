@@ -1,0 +1,9 @@
+title: Bufferbloat
+description: >
+  Slow link with a huge FIFO. Idle latency is fine but any bulk transfer adds
+  seconds of queueing delay for everything else on the link.
+category: impairment
+delay: 10ms
+queue: 3s
+up: {rate: 512kbit}
+down: {rate: 2mbit}

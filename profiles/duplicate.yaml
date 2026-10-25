@@ -1,0 +1,5 @@
+title: Duplication
+description: 5% of packets are delivered twice.
+category: impairment
+delay: 5ms
+duplicate: 5%

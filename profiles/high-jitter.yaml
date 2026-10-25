@@ -1,0 +1,9 @@
+title: High jitter
+description: >
+  50 ms mean delay with heavy-tailed variation. Jitter is allowed to reorder
+  packets here (preserve_order false), as on multipath routes.
+category: impairment
+delay: 50ms
+jitter: 50ms
+distribution: pareto
+preserve_order: false

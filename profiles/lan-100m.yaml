@@ -1,0 +1,7 @@
+title: LAN 100 Mbit/s
+description: Fast Ethernet, e.g. embedded boards and older switches.
+category: lan
+delay: 0.3ms
+jitter: 0.05ms
+distribution: normal
+rate: 100mbit

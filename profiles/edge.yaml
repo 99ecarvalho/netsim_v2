@@ -1,0 +1,11 @@
+title: 2.5G EDGE
+description: GSM EDGE. Typical of rural coverage and legacy M2M modems.
+category: mobile
+tags: [2g, gsm, cellular]
+delay: 150ms
+jitter: 50ms
+distribution: lognormal
+loss: 0.5%
+queue: 2s
+up: {rate: 100kbit}
+down: {rate: 200kbit}

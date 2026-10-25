@@ -1,0 +1,14 @@
+title: Wi-Fi (edge of coverage)
+description: >
+  Weak signal far from the AP. Low rate, large and erratic delay, bursty loss,
+  some duplicates and reordering caused by link-layer retransmissions.
+category: wifi
+delay: 15ms
+jitter: 25ms
+distribution: paretonormal
+burst_loss: {p: 1%, r: 25%}
+duplicate: 0.1%
+reorder: 1%
+queue: 500ms
+up: {rate: 5mbit}
+down: {rate: 8mbit}

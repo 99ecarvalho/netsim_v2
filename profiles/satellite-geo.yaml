@@ -1,0 +1,10 @@
+title: Satellite GEO
+description: Geostationary satellite (VSAT). ~600 ms RTT regardless of bandwidth.
+category: satellite
+delay: 300ms
+jitter: 20ms
+distribution: normal
+loss: 0.5%
+queue: 1s
+up: {rate: 3mbit}
+down: {rate: 25mbit}

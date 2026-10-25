@@ -1,0 +1,11 @@
+title: Train through a tunnel
+description: LTE degrades to 3G, then nothing for 30 s, then slowly recovers.
+category: dynamic
+extends: 4g-lte
+timeline:
+  loop: true
+  steps:
+    - {duration: 60s, label: open air}
+    - {duration: 20s, label: entering, delay: 75ms, jitter: 25ms, loss: 1%, up: {rate: 384kbit}, down: {rate: 1.5mbit}}
+    - {duration: 30s, label: tunnel, blackhole: true}
+    - {duration: 10s, label: exit (edge), delay: 150ms, jitter: 50ms, up: {rate: 100kbit}, down: {rate: 200kbit}}

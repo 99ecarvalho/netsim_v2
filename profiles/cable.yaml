@@ -1,0 +1,9 @@
+title: Cable (DOCSIS)
+description: Cable broadband. Decent bandwidth, moderate jitter.
+category: wan
+delay: 8ms
+jitter: 4ms
+distribution: normal
+queue: 300ms
+up: {rate: 10mbit}
+down: {rate: 200mbit}

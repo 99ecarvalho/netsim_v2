@@ -1,0 +1,14 @@
+title: Elevator car modem
+description: >
+  Cellular modem in an elevator car. Good signal on upper floors, degrading
+  while descending, no coverage in the basement/pit, then back up.
+category: dynamic
+tags: [iot, elevator]
+extends: 4g-lte
+timeline:
+  loop: true
+  steps:
+    - {duration: 20s, label: top floors}
+    - {duration: 15s, label: descending, delay: 50ms, jitter: 30ms, burst_loss: {p: 0.5%, r: 25%}, up: {rate: 1mbit}, down: {rate: 5mbit}}
+    - {duration: 8s, label: basement, blackhole: true}
+    - {duration: 15s, label: ascending, delay: 50ms, jitter: 30ms, burst_loss: {p: 0.5%, r: 25%}, up: {rate: 1mbit}, down: {rate: 5mbit}}
