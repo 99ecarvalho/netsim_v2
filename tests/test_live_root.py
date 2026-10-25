@@ -93,3 +93,34 @@ async def test_capture_stops_at_size_limit(engine, monkeypatch):
     await asyncio.sleep(0.3)
     assert cap.proc.truncated and not cap.proc.running
     assert cap.path.stat().st_size <= 2000 + len(capture.PCAP_HEADER)
+
+
+@pytest.fixture
+def container():
+    if subprocess.run(["docker", "image", "inspect", "nginx:alpine"], capture_output=True).returncode:
+        pytest.skip("needs docker and the nginx:alpine image")
+    name = "netsim-test-shared"
+    subprocess.run(["docker", "rm", "-f", name], capture_output=True)
+    subprocess.run(["docker", "run", "-d", "--rm", "--name", name, "nginx:alpine"], check=True, capture_output=True)
+    yield name
+    subprocess.run(["docker", "rm", "-f", name], capture_output=True)
+
+
+async def test_container_cannot_join_two_labs(engine, container):
+    from netsim.engine import EngineError
+    text = f"nodes: {{c: {{}}, api: {{kind: container, container: {container}}}}}\nlinks:\n  - {{a: c, b: api}}\n"
+    engine.labs.save("t-ctr-a", text)
+    engine.labs.save("t-ctr-b", text)
+
+    def ifaces():
+        out = subprocess.run(["docker", "exec", container, "ip", "-o", "link"], capture_output=True, text=True)
+        return sorted(line.split(":")[1].strip().split("@")[0] for line in out.stdout.splitlines())
+
+    await engine.up("t-ctr-a")
+    before = ifaces()
+    assert any(i.startswith("sim") for i in before)
+    with pytest.raises(EngineError, match="already in lab t-ctr-a"):
+        await engine.up("t-ctr-b")
+    assert ifaces() == before  # the failed lab did not touch the first one's interface
+    await engine.down("t-ctr-a")
+    assert not any(i.startswith("sim") for i in ifaces())

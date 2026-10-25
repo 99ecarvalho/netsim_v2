@@ -72,7 +72,9 @@ def test_container_node_keeps_its_default_route():
                                "host": {"kind": "external"}},
                         links=[{"a": "c", "b": "api"}, {"a": "api", "b": "host"}]), "t", "10.201.0.0/16")
     assert p.nodes["api"].ns == "netsimc-t@api"
-    assert p.nodes["api"].ifaces[0].name == "sim0"
+    from netsim.topology import lab_tag
+    assert p.nodes["api"].ifaces[0].name == f"sim{lab_tag('t')}0"
+    assert len(p.nodes["api"].ifaces[0].name) <= 15
     assert all(r.dst != "default" for r in p.nodes["api"].routes)
     assert any(r.dst == "default" for r in p.nodes["c"].routes)
     with pytest.raises(ValueError):

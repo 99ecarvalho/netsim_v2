@@ -204,7 +204,8 @@ def compile_lab(lab: Lab, name: str, base: str | IPv4Net) -> Plan:
         elif kinds[node] == "switch":
             ifname = f"p{i}"
         elif kinds[node] == "container":
-            ifname = f"{CONTAINER_IF_PREFIX}{i}"  # the container already has its own eth0
+            # the container has its own eth0; the lab tag keeps labs from touching each other's interfaces
+            ifname = f"{CONTAINER_IF_PREFIX}{tag}{i}"
         else:
             ifname = f"eth{i}"
         iface = Iface(node, ifname, link_id, side, peer, mtu=mtu)

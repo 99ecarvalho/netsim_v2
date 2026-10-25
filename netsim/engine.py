@@ -38,7 +38,7 @@ from netsim.store import LabStore, ProfileStore, StoreError, parse_yaml
 from netsim import system
 from netsim.system import CommandError, Runner, drop_privs_prefix, list_netns, nsexec_prefix
 from netsim.topology import (ATTACHED_PREFIX, CONTAINER_IF_PREFIX, HOST_IF_PREFIX, NS_PREFIX, Plan, PlanError,
-                             compile_lab, lab_tag)
+                             compile_lab, lab_tag, ns_lab)
 
 log = logging.getLogger("netsim.engine")
 
@@ -184,6 +184,7 @@ class LabRuntime:
     stats: deque = field(default_factory=lambda: deque(maxlen=STATS_HISTORY))
     counters: dict = field(default_factory=dict)
     iptables_rules: list[list[str]] = field(default_factory=list)
+    containers: dict[str, tuple[int, str]] = field(default_factory=dict)  # node -> (pid, netns id)
     source_text: str = ""
     error: str | None = None
 
@@ -385,12 +386,40 @@ class Engine:
         if missing:
             raise EngineError(f"missing {', '.join(missing)} (see `netsim doctor`)")
 
-    async def _check_conflicts(self, name: str, plan: Plan) -> None:
-        """Refuse address or name clashes with running labs and, when the lab reaches the host, its routes."""
+    async def _check_conflicts(self, name: str, lab: Lab, plan: Plan) -> dict[str, tuple[int, str]]:
+        """Refuse clashes with running labs (addresses, names, containers) and with host routes.
+
+        Returns the containers to attach: node -> (pid, network namespace id).
+        """
+        containers: dict[str, tuple[int, str]] = {}
+        taken = {netns: (other.name, node) for other in self.running.values() if other.name != name
+                 for node, (_, netns) in other.containers.items()}
+        for node in plan.nodes.values():
+            if node.kind != "container":
+                continue
+            ref = lab.nodes[node.name].container or ""
+            pid = await self._container_pid(self.global_runner, ref)
+            try:
+                netns = os.readlink(f"/proc/{pid}/ns/net")
+            except OSError as e:
+                raise EngineError(f"container {ref}: cannot read its network namespace: {e}") from None
+            if netns in taken:
+                other, other_node = taken[netns]
+                raise EngineError(f"container {ref} is already in lab {other} (node {other_node}); "
+                                  "a container can be in one running lab at a time")
+            taken[netns] = (name, node.name)
+            containers[node.name] = (pid, netns)
+        self._check_names(name, plan)
+        await self._check_subnets(name, plan)
+        return containers
+
+    def _check_names(self, name: str, plan: Plan) -> None:
         tag = lab_tag(name)
         for other in self.running.values():
-            if other.name != name and lab_tag(other.name) == tag and (plan.external and other.plan.external):
-                raise EngineError(f"labs {name} and {other.name} map to the same host interface names; rename one")
+            if other.name != name and lab_tag(other.name) == tag:
+                raise EngineError(f"labs {name} and {other.name} map to the same interface names; rename one")
+
+    async def _check_subnets(self, name: str, plan: Plan) -> None:
         if not plan.external:
             return  # namespaces are isolated: overlapping subnets cannot meet
         mine = [s.subnet for s in plan.segments]
@@ -434,12 +463,12 @@ class Engine:
                     base = await self.allocate_base(lab, name)
                     plan = compile_lab(lab, name, base)
                     self._preflight(lab, plan)
-                    await self._check_conflicts(name, plan)
+                    containers = await self._check_conflicts(name, lab, plan)
                 except (PlanError, EngineError) as e:
                     self.failures[name] = str(e)
                     self._labs_changed()
                     raise EngineError(str(e)) from None
-                rt = LabRuntime(name, lab, plan, Runner(), source_text=source)
+                rt = LabRuntime(name, lab, plan, Runner(), source_text=source, containers=containers)
                 rt.runner.on_record = lambda rec: self.bus.publish(f"lab:{name}:cmd", rec.to_json())
                 for link in lab.links:
                     rt.links[link.id] = LinkState(shapes[link.id], link.profile)
@@ -508,7 +537,7 @@ class Engine:
         # containers: borrow their network namespace
         for node in plan.nodes.values():
             if node.kind == "container":
-                pid = await self._container_pid(r, lab.nodes[node.name].container or "")
+                pid, _ = rt.containers[node.name]  # resolved and checked for sharing in _check_conflicts
                 await r.run(["ip", "netns", "attach", node.ns, str(pid)])
         # namespaces
         for node in plan.nodes.values():
@@ -634,10 +663,17 @@ class Engine:
         raise EngineError(f"container {ref!r} not found or not running (docker/podman inspect)")
 
     async def _detach(self, r: Runner, ns: str) -> None:
-        """Remove our interfaces from a container namespace and forget its name."""
+        """Remove this lab's interfaces from a container namespace and forget its name.
+
+        Only interfaces carrying the lab's tag are touched: never another lab's, never Docker's.
+        """
+        lab = ns_lab(ns)
+        if lab is None:
+            return
+        prefix = f"{CONTAINER_IF_PREFIX}{lab_tag(lab)}"
         for link in await r.ip_json(ns, "link", "show"):
             name = link.get("ifname", "")
-            if name.startswith(CONTAINER_IF_PREFIX):
+            if name.startswith(prefix):
                 await r.ip(ns, "link", "del", name, check=False)
         await r.run(["ip", "netns", "del", ns], check=False)  # only unmounts: the container keeps it alive
 
