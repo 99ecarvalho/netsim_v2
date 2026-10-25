@@ -1,0 +1,77 @@
+description: >
+  Branch office reaching a data center over DSL and an ISP backbone. Laptops on
+  Wi-Fi, a desktop on cable; a web server and a database in the data center.
+  Programs generate traffic on their own: page loads, a large download and
+  database queries.
+nodes:
+  laptop1: {icon: laptop}
+  laptop2: {icon: laptop}
+  desktop: {icon: desktop}
+  wifi: {kind: switch, description: office access point}
+  office: {kind: switch, description: office LAN}
+  branch-gw: {kind: router, icon: router}
+  isp: {kind: router, icon: cloud, description: provider backbone}
+  dc-gw: {kind: router, icon: router}
+  dc: {kind: switch, description: data center LAN}
+  web: {icon: server}
+  db: {icon: database}
+  host: {kind: external, internet: true}
+links:
+  - {a: laptop1, b: wifi, profile: wifi-good}
+  - {a: laptop2, b: wifi, profile: wifi-busy}
+  - {a: wifi, b: office, profile: lan-gigabit}
+  - {a: desktop, b: office, profile: lan-gigabit}
+  - {a: branch-gw, b: office, profile: lan-gigabit}
+  - {a: branch-gw, b: isp, profile: dsl, name: last-mile}
+  - {a: isp, b: dc-gw, profile: wan-continental, name: backbone}
+  - {a: dc-gw, b: dc, profile: lan-gigabit}
+  - {a: web, b: dc, profile: lan-gigabit}
+  - {a: db, b: dc, profile: lan-gigabit}
+  - {a: isp, b: host, profile: ideal}
+programs:
+  - name: www
+    node: web
+    cmd: cd "$(mktemp -d)" && head -c 30000000 /dev/urandom > big.bin && echo hello > index.html && python3 -m http.server 8000
+    autostart: true
+  - name: database
+    node: db
+    cmd: python3 -m http.server 5432
+    autostart: true
+  - name: app-queries
+    node: web
+    cmd: while true; do curl -s -o /dev/null http://db:5432/; sleep 0.5; done
+    autostart: true
+    delay: 2s
+  - name: browsing1
+    node: laptop1
+    cmd: while true; do curl -s -o /dev/null -w "page %{time_total}s\n" http://web:8000/; sleep 1; done
+    autostart: true
+    delay: 2s
+  - name: browsing2
+    node: laptop2
+    cmd: while true; do curl -s -o /dev/null -w "page %{time_total}s\n" http://web:8000/; sleep 2; done
+    autostart: true
+    delay: 2s
+  - name: download
+    node: desktop
+    cmd: while true; do curl -s -o /dev/null -w "30 MB in %{time_total}s\n" http://web:8000/big.bin; sleep 3; done
+    autostart: true
+    delay: 3s
+  - name: upload
+    node: laptop1
+    cmd: while true; do head -c 2000000 /dev/zero | curl -s -o /dev/null -w "upload %{time_total}s\n" --data-binary @- http://web:8000/; sleep 4; done
+    autostart: true
+    delay: 4s
+layout:
+  laptop1: {x: 0, y: 0}
+  laptop2: {x: 0, y: 170}
+  wifi: {x: 250, y: 85}
+  desktop: {x: 250, y: 310}
+  office: {x: 500, y: 200}
+  branch-gw: {x: 760, y: 200}
+  isp: {x: 760, y: 430}
+  host: {x: 500, y: 480}
+  dc-gw: {x: 1020, y: 430}
+  dc: {x: 1020, y: 200}
+  web: {x: 1280, y: 110}
+  db: {x: 1280, y: 300}
