@@ -236,7 +236,19 @@ netsim run -p my-modem -- curl -sI https://example.com
 If something is wrong, netsim says which field and why. You can also edit profiles in the web UI:
 there is a form on the left and the YAML on the right. Both edit the same file.
 
-![Profile editor](screenshots/profile.png)
+The form has one row per field and one column per direction. Empty means "not set":
+
+<img src="screenshots/manual/profile-form.png" alt="Profile form" width="620">
+
+Below it, a histogram shows the delays the profile will produce. Use it to choose a distribution:
+
+<img src="screenshots/manual/profile-histogram.png" alt="Delay histogram" width="620">
+
+And the result for each direction, with the exact command netsim will run:
+
+<img src="screenshots/manual/profile-result.png" alt="Profile result" width="620">
+
+When you save a profile, labs that are running with it pick up the change at once.
 
 ### 4.6 Profiles that change over time
 
@@ -256,6 +268,10 @@ timeline:
 Each step can set any field. Fields not set in a step come from the top of the file.
 With `loop: true` the steps repeat forever. With `loop: false` they run once, then the link
 goes back to the base values.
+
+The profile editor draws the steps. Red steps drop everything:
+
+<img src="screenshots/manual/profile-timeline.png" alt="Timeline of gsm-flaky" width="620">
 
 Shipped examples: `flapping`, `gsm-flaky`, `lte-handover`, `train-tunnel`, `elevator-shaft`,
 `congestion-wave`, `satellite-leo`.
@@ -455,53 +471,88 @@ running. The theme button is at the top right.
 The graph on the left and the YAML on the right are the same file. Change one, the other follows.
 Comments in the YAML are kept.
 
-- Add nodes with the buttons on top of the graph.
-- Link two nodes: hover a node, drag its small dot onto the other node.
-- Click a node or a link to edit it. Pick a profile for a link from the list.
-- `Del` removes the selection.
-- The grid button arranges the graph automatically.
+**Add a node** with the buttons on top of the graph:
 
-The editor checks the file as you type. Errors are underlined in the YAML. When the file is valid,
-the graph shows the addresses each node will get. `Ctrl+S` saves. **Start** saves and starts.
+<img src="screenshots/manual/design-palette.png" alt="Node buttons" width="520">
+
+**Link two nodes.** Hover a node. A small dot appears on its right edge. Drag the dot onto the
+other node and release:
+
+<img src="screenshots/manual/design-connect.png" alt="Drag the dot to link" width="520">
+
+**Edit a node or a link** by clicking it. For a link you pick the profile, add overrides per
+direction, and set addresses if you need them:
+
+<img src="screenshots/manual/design-inspector.png" alt="Link inspector" width="360">
+
+`Del` removes the selection. The last button on the toolbar arranges the graph automatically.
+
+**Errors** show in red above the editor while you type, with the line marked:
+
+<img src="screenshots/manual/design-error.png" alt="Validation error" width="620">
+
+When the file is valid, the graph shows the addresses each node will get. `Ctrl+S` saves.
+**Start** saves and starts.
 
 ### 7.2 Monitor
 
 ![Monitor view](screenshots/monitor.png)
 
 This is the running lab. Each link has two lanes: blue for a→b, amber for b→a. A lane gets wider
-with more traffic and moves while traffic flows. The label shows bits per second each way, drops
-per second, and the current timeline step.
+with more traffic and moves while traffic flows.
 
-Click a link to see its charts and controls:
+The label on a link shows bits per second in each direction, the profile, and the current
+timeline step. **Click the label** to control that link:
 
-![Link panel](screenshots/link-panel.png)
+<img src="screenshots/manual/monitor-edge.png" alt="Click a link label" width="560">
 
-- the profile in use, which you can change now;
-- **Cut** drops everything; **Heal** brings it back;
-- the timeline, with the current step;
-- throughput, drops and queue over the last minutes;
-- live overrides: type a delay, loss or rate and apply it to one or both directions;
-- the exact netem commands applied.
+The panel on the right opens. At the top are the controls:
 
-Click a node to see what its TCP connections experience: round-trip time, congestion window,
-retransmissions. It also shows listening ports and routes.
+<img src="screenshots/manual/monitor-link-controls.png" alt="Link controls" width="620">
 
-![Node panel](screenshots/node-tcp.png)
+- **The list** switches the profile now. The change is live only: a yellow note tells you what
+  the file says. **Save to lab** writes it into the lab file, so it stays after a restart.
+- **Cut** drops all traffic. **Heal** brings it back. Picking a profile also brings it back.
+- The two lines below show what is applied in each direction.
+
+For a profile with a timeline you also see the steps, the current one framed, and when the next
+one starts:
+
+<img src="screenshots/manual/monitor-timeline.png" alt="Timeline position" width="620">
+
+Below come the charts: throughput per direction, drops and queue, for the last minutes.
+
+<img src="screenshots/manual/monitor-throughput.png" alt="Throughput chart" width="620">
+
+**Live override** changes single values on top of the profile. Pick the direction, type the
+values, press **Apply**. Overrides are temporary: switching profile or restarting drops them.
+
+<img src="screenshots/manual/monitor-override.png" alt="Live override" width="520">
+
+**Click a node** to see what its TCP connections experience: round-trip time, congestion window,
+retransmissions, bytes. It refreshes every two seconds. It also lists listening ports and routes.
+
+<img src="screenshots/manual/node-tcp.png" alt="TCP connections of a node" width="620">
 
 ### 7.3 Traffic
 
 ![Traffic view](screenshots/traffic.png)
 
-Left: packet capture. Pick a link and which end to listen on, optionally a filter
-(`tcp port 8000`), and press **Start**. Packets appear live; the arrow shows if the node sent or
-received each one. **.pcap** downloads the capture for Wireshark.
+**Capture.** Pick a link, pick which end listens, optionally type a filter (`tcp port 8000`), press
+**Start**. Packets appear as they pass. The arrow shows if that end sent (↗) or received (↙) the
+packet. **.pcap** downloads everything for Wireshark.
 
-Right: probes. **ping** measures round-trip time and loss between two nodes. **iperf3** measures
-how much data really gets through. Use them to check that a profile does what you expect.
+<img src="screenshots/manual/traffic-capture.png" alt="Packet capture" width="680">
+
+**Probes.** ping measures round-trip time and loss between two nodes. iperf3 measures how much data
+really gets through. Use them to check that a link does what you expect. Here a ping crosses the
+flaky uplink; the gaps are the outages of the timeline:
+
+<img src="screenshots/manual/traffic-probe.png" alt="Ping probe" width="560">
 
 ### 7.4 Programs, Terminal, Commands
 
-![Programs view](screenshots/programs.png)
+<img src="screenshots/manual/programs.png" alt="Programs" width="680">
 
 **Programs** lists the lab's programs. Start, stop, restart or send Ctrl-C. The right side shows
 the output, live.
@@ -546,10 +597,18 @@ netsim cut   iot-gateway uplink                       # pull the cable
 netsim heal  iot-gateway uplink                       # plug it back
 ```
 
-These changes live in memory. They are gone when the lab stops. To keep them, edit the lab file.
+These changes live in memory. They are gone when the lab stops. Switching profile also drops
+earlier overrides, including a cut.
 
-If you edit the lab file while it runs, the change applies after `netsim restart LAB`. The UI shows
-"file changed · restart to apply" until you do.
+To keep a change, put it in the lab file. In the UI: **Save to lab** on the link panel, or edit
+the link in Design and save. You don't need to restart for that. When you save a running lab:
+
+- profile and shaping changes on links apply at once;
+- moving nodes, editing descriptions: nothing to apply;
+- new nodes, new links, changed addresses, programs or proxies: netsim tells you to restart
+  (`netsim restart LAB`). Until then the toolbar shows "file changed · restart to apply".
+
+Saving a profile re-applies it on every running link that uses it.
 
 ---
 
