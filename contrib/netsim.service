@@ -1,0 +1,15 @@
+[Unit]
+Description=netsim network simulator daemon
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=@NETSIM@ serve --user @USER@
+Restart=on-failure
+# labs are torn down on stop
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
