@@ -34,6 +34,7 @@ from netsim.units import UnitError
 
 log = logging.getLogger("netsim.server")
 COOKIE = "netsim_token"
+PREVIEW_NAME = "preview-draft"  # stand-in name for validating unsaved documents; must satisfy NAME_RE
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "[::1]", "::1"}
 
 
@@ -191,9 +192,9 @@ def create_app(engine: Engine, token: str, check_host: bool = True) -> FastAPI:
     @app.post("/api/profiles/validate")
     async def validate_profile(body: ValidateBody):
         try:
-            prof = parse_yaml(body.text, Profile, body.name or "_preview")
-            lookup = lambda n: prof if n == (body.name or "_preview") else profiles.get(n)  # noqa: E731
-            flat = flatten_profile(body.name or "_preview", lookup)
+            prof = parse_yaml(body.text, Profile, body.name or PREVIEW_NAME)
+            lookup = lambda n: prof if n == (body.name or PREVIEW_NAME) else profiles.get(n)  # noqa: E731
+            flat = flatten_profile(body.name or PREVIEW_NAME, lookup)
             steps = flat.timeline.steps if flat.timeline else []
             preview = {d: _render(_eff(flat, d)) for d in DIRECTIONS}
             step_preview = [{"label": s.label, "duration": s.duration,
@@ -238,7 +239,7 @@ def create_app(engine: Engine, token: str, check_host: bool = True) -> FastAPI:
 
     @app.post("/api/labs/validate")
     async def validate_lab(body: ValidateBody):
-        name = body.name or "_preview"
+        name = body.name or PREVIEW_NAME
         try:
             lab = parse_yaml(body.text, Lab, name)
             return {"ok": True, "plan": await engine.preview(lab, name)}
