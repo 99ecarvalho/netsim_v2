@@ -26,7 +26,9 @@ IPv4Net = ipaddress.IPv4Network
 IPv4If = ipaddress.IPv4Interface
 
 NS_PREFIX = "netsim-"
+ATTACHED_PREFIX = "netsimc-"  # names for container namespaces we attach to but do not own
 HOST_IF_PREFIX = "nsx"
+CONTAINER_IF_PREFIX = "sim"
 
 
 class PlanError(ValueError):
@@ -37,8 +39,8 @@ def lab_tag(lab_name: str) -> str:
     return hashlib.sha1(lab_name.encode()).hexdigest()[:5]
 
 
-def ns_name(lab_name: str, node: str) -> str:
-    return f"{NS_PREFIX}{lab_name}-{node}"
+def ns_name(lab_name: str, node: str, kind: str = "host") -> str:
+    return f"{ATTACHED_PREFIX if kind == 'container' else NS_PREFIX}{lab_name}-{node}"
 
 
 @dataclass
@@ -178,7 +180,7 @@ def compile_lab(lab: Lab, name: str, base: str | IPv4Net) -> Plan:
     external = next((n for n, k in kinds.items() if k == "external"), None)
     tag = lab_tag(name)
 
-    nodes = {n: NodePlan(n, k, None if k == "external" else ns_name(name, n)) for n, k in kinds.items()}
+    nodes = {n: NodePlan(n, k, None if k == "external" else ns_name(name, n, k)) for n, k in kinds.items()}
     counters: dict[str, int] = {n: 0 for n in nodes}
 
     def new_iface(node: str, link_id: str, side: str, peer: str, mtu: int | None) -> Iface:
@@ -188,6 +190,8 @@ def compile_lab(lab: Lab, name: str, base: str | IPv4Net) -> Plan:
             ifname = f"{HOST_IF_PREFIX}{tag}{i}"
         elif kinds[node] == "switch":
             ifname = f"p{i}"
+        elif kinds[node] == "container":
+            ifname = f"{CONTAINER_IF_PREFIX}{i}"  # the container already has its own eth0
         else:
             ifname = f"eth{i}"
         iface = Iface(node, ifname, link_id, side, peer, mtu=mtu)
@@ -325,7 +329,8 @@ def compile_lab(lab: Lab, name: str, base: str | IPv4Net) -> Plan:
             _, nearest = min(candidates)
             via, dev = first_hop[nearest]
             routes.append(Route(str(seg.subnet), via, dev))
-        if external and src != external and external in first_hop:
+        # containers keep their own default route (docker bridge); they only learn the lab subnets
+        if external and src != external and external in first_hop and kinds[src] != "container":
             via, dev = first_hop[external]
             routes.append(Route("default", via, dev))
         nodes[src].routes = routes

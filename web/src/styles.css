@@ -911,6 +911,11 @@ table.compact td {
   color: var(--ok);
 }
 
+.netnode.k-container .ico {
+  background: color-mix(in srgb, var(--up) 15%, transparent);
+  color: var(--up);
+}
+
 .netnode.k-switch {
   min-width: 170px;
   border-style: dashed;

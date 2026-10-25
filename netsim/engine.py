@@ -35,7 +35,8 @@ from netsim.shaping import Direction, LinkShape, NetemSpec, ShapingError, flatte
 from netsim.store import LabStore, ProfileStore, StoreError, parse_yaml
 from netsim import system
 from netsim.system import CommandError, Runner, drop_privs_prefix, list_netns, nsexec_prefix
-from netsim.topology import HOST_IF_PREFIX, NS_PREFIX, Plan, PlanError, compile_lab, lab_tag, ns_name
+from netsim.topology import (ATTACHED_PREFIX, CONTAINER_IF_PREFIX, HOST_IF_PREFIX, NS_PREFIX, Plan, PlanError,
+                             compile_lab, lab_tag)
 
 log = logging.getLogger("netsim.engine")
 
@@ -178,7 +179,13 @@ class LabRuntime:
 
     @property
     def namespaces(self) -> list[str]:
-        return [n.ns for n in self.plan.nodes.values() if n.ns]
+        """Namespaces netsim owns (created and destroyed with the lab)."""
+        return [n.ns for n in self.plan.nodes.values() if n.ns and n.kind != "container"]
+
+    @property
+    def attached(self) -> list[str]:
+        """Container namespaces we only borrow: never kill processes or delete them."""
+        return [n.ns for n in self.plan.nodes.values() if n.ns and n.kind == "container"]
 
     def iface_ns(self, node: str) -> str | None:
         return self.plan.nodes[node].ns
@@ -225,11 +232,15 @@ class Engine:
         removed = []
         r = self.global_runner
         known = {ns for rt in self.running.values() for ns in rt.namespaces}
+        known |= {ns for rt in self.running.values() for ns in rt.attached}
         for ns in await list_netns():
             if ns.startswith(NS_PREFIX) and ns not in known:
                 await self._kill_ns_pids(r, ns)
                 await r.run(["ip", "netns", "del", ns], check=False)
                 shutil.rmtree(NETNS_ETC / ns, ignore_errors=True)
+                removed.append(ns)
+            elif ns.startswith(ATTACHED_PREFIX) and ns not in known:
+                await self._detach(r, ns)
                 removed.append(ns)
         known_tags = {lab_tag(n) for n in self.running}
         for link in await r.ip_json(None, "link", "show"):
@@ -431,13 +442,22 @@ class Engine:
 
     async def _build(self, rt: LabRuntime) -> None:
         r, plan, lab = rt.runner, rt.plan, rt.lab
+        existing = await list_netns()
         for ns in rt.namespaces:
-            if ns in await list_netns():
+            if ns in existing:
                 await self._kill_ns_pids(r, ns)
                 await r.run(["ip", "netns", "del", ns], check=False)
+        for ns in rt.attached:
+            if ns in existing:
+                await self._detach(r, ns)
+        # containers: borrow their network namespace
+        for node in plan.nodes.values():
+            if node.kind == "container":
+                pid = await self._container_pid(r, lab.nodes[node.name].container or "")
+                await r.run(["ip", "netns", "attach", node.ns, str(pid)])
         # namespaces
         for node in plan.nodes.values():
-            if not node.ns:
+            if not node.ns or node.kind == "container":
                 continue
             await r.run(["ip", "netns", "add", node.ns])
             await r.ip(node.ns, "link", "set", "lo", "up")
@@ -529,6 +549,9 @@ class Engine:
         for probe in [p for p in self.probes.values() if p.lab == rt.name]:
             await self.probe_stop(probe.id)
         existing = await list_netns()
+        for ns in rt.attached:
+            if ns in existing:
+                await self._detach(r, ns)
         for ns in rt.namespaces:
             if ns in existing:
                 await self._kill_ns_pids(r, ns)
@@ -544,6 +567,23 @@ class Engine:
         rt.iptables_rules.clear()
         if rt.plan.external and shutil.which("nft"):
             await r.run(["nft", "delete", "table", "ip", f"netsim_{tag}"], check=False)
+
+    async def _container_pid(self, r: Runner, ref: str) -> int:
+        for tool in ("docker", "podman"):
+            if not shutil.which(tool):
+                continue
+            out = await r.run([tool, "inspect", "-f", "{{.State.Pid}}", ref], check=False, quiet=True)
+            if out.strip().isdigit() and int(out.strip()) > 0:
+                return int(out.strip())
+        raise EngineError(f"container {ref!r} not found or not running (docker/podman inspect)")
+
+    async def _detach(self, r: Runner, ns: str) -> None:
+        """Remove our interfaces from a container namespace and forget its name."""
+        for link in await r.ip_json(ns, "link", "show"):
+            name = link.get("ifname", "")
+            if name.startswith(CONTAINER_IF_PREFIX):
+                await r.ip(ns, "link", "del", name, check=False)
+        await r.run(["ip", "netns", "del", ns], check=False)  # only unmounts: the container keeps it alive
 
     async def _kill_ns_pids(self, r: Runner, ns: str) -> None:
         out = await r.run(["ip", "netns", "pids", ns], check=False, quiet=True)

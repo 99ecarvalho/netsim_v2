@@ -1,6 +1,7 @@
 import {
   Building2,
   Car,
+  Container,
   Cloud,
   Cpu,
   Database,
@@ -45,6 +46,8 @@ export function nodeIcon(kind: NodeKind | undefined, icon?: string): LucideIcon 
       return Network;
     case "external":
       return Globe;
+    case "container":
+      return Container;
     default:
       return Monitor;
   }

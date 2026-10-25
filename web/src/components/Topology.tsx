@@ -20,7 +20,7 @@ import {
   type Node,
   type NodeProps,
 } from "@xyflow/react";
-import { Globe, LayoutGrid, Monitor, Network, Router } from "lucide-react";
+import { Container, Globe, LayoutGrid, Monitor, Network, Router } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo } from "react";
 import { fmtBps } from "../lib/format";
 import type { LabSpec, NodeKind, Plan, ProgramRuntime, Runtime, StatsSample } from "../lib/types";
@@ -93,7 +93,7 @@ const NetNode = memo(function NetNode({ id, data, selected }: NodeProps<Node<Net
             </div>
           ))
         ) : (
-          <div className="sub">{data.kind === "switch" ? "L2 bridge" : data.kind === "external" ? (data.internet ? "this host + internet" : "this host") : data.kind}</div>
+          <div className="sub">{data.kind === "switch" ? "L2 bridge" : data.kind === "external" ? (data.internet ? "this host + internet" : "this host") : data.kind === "container" ? "docker container" : data.kind}</div>
         )}
       </div>
       {data.programs.length > 0 && (
@@ -361,6 +361,9 @@ function Graph(props: Props) {
           <button className="btn small ghost" onClick={() => addAtCenter("external")} title="The real host / internet (max one)"
             disabled={Object.values(data.nodes ?? {}).some((n) => n?.kind === "external")}>
             <Globe size={14} /> External
+          </button>
+          <button className="btn small ghost" onClick={() => addAtCenter("container")} title="Attach a running Docker container">
+            <Container size={14} /> Container
           </button>
           <span style={{ width: 1, background: "var(--border)", margin: "2px 2px" }} />
           <button className="btn small ghost" title="Arrange automatically" onClick={() => {

@@ -1,0 +1,11 @@
+description: >
+  Differential test against a Docker container: identical clients reach the
+  same container, one over 3G and one over Ethernet. Set `container:` to the
+  name of your running container (docker ps), e.g. a compose service.
+nodes:
+  client-3g: {icon: phone}
+  client-eth: {icon: laptop}
+  api: {kind: container, container: my-api, icon: server}
+links:
+  - {a: client-3g, b: api, profile: 3g-hspa}
+  - {a: client-eth, b: api, profile: lan-gigabit}

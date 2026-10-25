@@ -50,7 +50,7 @@ function flow(doc: Document, value: object) {
   return doc.createNode(value, { flow: true });
 }
 
-const KIND_PREFIX: Record<NodeKind, string> = { host: "host", router: "router", switch: "switch", external: "host" };
+const KIND_PREFIX: Record<NodeKind, string> = { host: "host", router: "router", switch: "switch", external: "host", container: "container" };
 
 export function freeName(data: LabSpec, kind: NodeKind): string {
   if (kind === "external" && !data.nodes?.host) return "host";
@@ -65,6 +65,7 @@ export function addNode(doc: Document, name: string, kind: NodeKind, pos?: { x: 
   const nodes = ensureMap(doc, "nodes");
   const spec: Record<string, unknown> = kind === "host" ? {} : { kind };
   if (kind === "external") spec.internet = true;
+  if (kind === "container") spec.container = "my-container";
   nodes.set(name, flow(doc, spec));
   if (pos) setLayout(doc, { [name]: pos });
 }

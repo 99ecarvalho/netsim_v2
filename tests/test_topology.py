@@ -63,3 +63,15 @@ def test_validation_errors():
     ok = lab(nodes={"a": {}, "b": {}}, links=[{"a": "a", "b": "b"}],
              proxies=[{"name": "p", "listen": "6000", "target": "127.0.0.1:5000", "via": ["a", "b"]}])
     assert ok.proxies[0].endpoints(ok.nodes) == ("a", "b")
+
+
+def test_container_node_keeps_its_default_route():
+    p = compile_lab(lab(nodes={"c": {}, "api": {"kind": "container", "container": "web"},
+                               "host": {"kind": "external"}},
+                        links=[{"a": "c", "b": "api"}, {"a": "api", "b": "host"}]), "t", "10.201.0.0/16")
+    assert p.nodes["api"].ns == "netsimc-t-api"
+    assert p.nodes["api"].ifaces[0].name == "sim0"
+    assert all(r.dst != "default" for r in p.nodes["api"].routes)
+    assert any(r.dst == "default" for r in p.nodes["c"].routes)
+    with pytest.raises(ValueError):
+        lab(nodes={"api": {"kind": "container"}})

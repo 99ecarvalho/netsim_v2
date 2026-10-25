@@ -1,4 +1,4 @@
-export type NodeKind = "host" | "router" | "switch" | "external";
+export type NodeKind = "host" | "router" | "switch" | "external" | "container";
 export type Direction = "up" | "down";
 
 export interface LabSummary {
@@ -29,6 +29,7 @@ export interface LabNodeSpec {
   icon?: string;
   internet?: boolean;
   subnet?: string;
+  container?: string;
   sysctl?: Record<string, string | number>;
 }
 

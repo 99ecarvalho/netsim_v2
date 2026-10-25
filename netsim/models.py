@@ -163,7 +163,7 @@ class Profile(DirectionalParams):
 
 # --------------------------------------------------------------------------- labs
 
-NodeKind = Literal["host", "router", "switch", "external"]
+NodeKind = Literal["host", "router", "switch", "external", "container"]
 
 
 class Node(_Strict):
@@ -172,6 +172,7 @@ class Node(_Strict):
     icon: str | None = Field(None, description="UI hint: laptop, server, phone, iot, cloud, ...")
     internet: bool = Field(False, description="external only: NAT lab traffic to the host's default route")
     subnet: str | None = Field(None, description="switch only: CIDR shared by attached nodes")
+    container: str | None = Field(None, description="container only: name or id of a running Docker/Podman container")
     sysctl: dict[str, str | int] = Field(default_factory=dict, description="extra sysctls inside the node")
 
     @model_validator(mode="after")
@@ -180,6 +181,8 @@ class Node(_Strict):
             raise ValueError("'internet' is only valid on external nodes")
         if self.subnet and self.kind != "switch":
             raise ValueError("'subnet' on a node is only valid for switches (put it on the link otherwise)")
+        if (self.kind == "container") != bool(self.container):
+            raise ValueError("container nodes need 'container: <name or id>' (and only they take it)")
         return self
 
 
@@ -309,6 +312,8 @@ class Lab(_Strict):
                 raise ValueError(f"program {p.name}: unknown node {p.node!r}")
             if self.nodes[p.node].kind == "switch":
                 raise ValueError(f"program {p.name}: cannot run on a switch")
+            if self.nodes[p.node].kind == "container":
+                raise ValueError(f"program {p.name}: run programs in a container with docker exec")
             if p.name in names:
                 raise ValueError(f"duplicate program name {p.name!r}")
             names.add(p.name)
