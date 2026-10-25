@@ -1,11 +1,17 @@
 # netsim
 
-Run programs on this machine as if they were on a 3G modem, a busy Wi-Fi, a satellite link or a flaky
-cellular uplink - without touching the rest of the machine's traffic.
+Your program works on your desk. Then it runs on a 3G modem, a crowded Wi-Fi or a satellite link,
+and it breaks. netsim lets you see that on your own machine, before it happens in the field.
 
-netsim builds virtual networks ("labs") out of Linux network namespaces and veth pairs, shapes every
-link direction with `tc netem`, and gives you a CLI and a web UI to edit topologies, switch link
-profiles live, capture packets and watch throughput, loss and latency in real time.
+It does three things:
+
+- It builds small virtual networks on your Linux machine. A network is called a **lab**.
+- It makes each link in the lab behave like a real one: delay, jitter, loss, limited bandwidth,
+  full buffers, outages. A link's behaviour is called a **profile**.
+- It puts your programs inside the lab, so their traffic crosses those links. Nothing else on the
+  machine is affected.
+
+You drive it from the terminal (`netsim ...`) or from a web page.
 
 ![Live monitor of a branch office lab](doc/screenshots/monitor.png)
 

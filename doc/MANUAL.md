@@ -1,8 +1,5 @@
 # netsim manual
 
-This manual starts simple and adds one idea at a time. Each chapter has commands you can run.
-Read it in order the first time. Later, jump to the chapter you need.
-
 1. [What netsim does](#1-what-netsim-does)
 2. [Install and start](#2-install-and-start)
 3. [Your first shaped command](#3-your-first-shaped-command)
